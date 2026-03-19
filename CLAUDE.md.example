@@ -1,0 +1,12 @@
+# Project context
+
+Read `project.aidl` to understand the full architecture of this project.
+It uses AIDL format — see `aidl-ref.md` for the symbol reference.
+
+After reading the .aidl file you should be able to:
+- Navigate the app mentally (all screens, routes, permissions)
+- Know every API endpoint and its inputs/outputs
+- Identify known anomalies and their causes
+- Generate code consistent with the existing architecture
+
+When you modify the project, update `project.aidl` to reflect your changes.

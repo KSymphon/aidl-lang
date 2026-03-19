@@ -1,0 +1,22 @@
+{
+  "name": "aidl-parser",
+  "version": "0.1.0",
+  "description": "Parser and validator for AIDL (AI Description Language)",
+  "author": "Kenny Symphon",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "aidl": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "parse": "tsx src/cli.ts",
+    "test": "tsx src/test.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "tsx": "^4.7.0",
+    "@types/node": "^20.0.0"
+  }
+}
