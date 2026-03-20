@@ -1,8 +1,8 @@
-╔G:aidl-language-system | AI Description Language v1.1 | self-teaching
-╔v:1.1
+╔G:aidl-language-system | AI Description Language v1.2 | self-teaching
+╔v:1.2
 § domain: language specification for AI perception
 § target: any AI system (Claude, GPT, Gemini, Llama, any LLM)
-§ state: production, march 2026
+§ state: production v1.2, march 2026
 § AIDL = AI Description Language — perception language designed for AI
 § AST = abstract syntax tree
 § RAG = retrieval-augmented generation
@@ -165,6 +165,88 @@
   .D: = data — structured dataset
   .X: = audit — anomaly/security report
 
+═══ CARTOGRAPHY — keeping the map true ═══
+
+── source anchors [&path] ──
+
+@source_anchors
+  < link any entity to its actual source code — AI verifies sync
+  .syntax /text {read}
+    @lieu [#permission] [&src/pages/lieu/]
+    .component [&src/components/Name.tsx]
+    $endpoint [&src/api/file.ts:functionName]
+    ^store [&src/stores/file.ts]
+  .purpose /text {read}
+    if the referenced file is renamed, moved, or deleted
+    the anchor breaks → AI detects and alerts
+    a broken anchor means the map is stale
+
+── freshness metadata ──
+
+@freshness
+  < header fields that declare map reliability
+  .verified: DATE — last validation date (by human or AI)
+  .coverage: X% — honest estimate of system coverage
+  .source: path/ — root directory for code verification
+  .example /text {read}
+    ╔A:myapp | next.js | v1.2
+    ╔v:1.2
+    ╔verified:2026-03-20
+    ╔coverage:85%
+    ╔source:src/
+
+── unmapped section ¬¬ ──
+
+@unmapped
+  < explicitly declare what the map does NOT cover
+  .purpose /text {read}
+    without this, AI cannot distinguish forgotten vs excluded
+    ¬¬ makes exclusion deliberate and documented
+  .syntax /text {read}
+    ¬¬ UNMAPPED
+      /api/internal/* — debug endpoints
+      src/legacy/* — deprecated, removal planned
+
+── module system for scale ──
+
+@modules
+  < beyond 40 lieux, split into sub-maps
+  .master_file /text {read}
+    imports modules with &file.aidl
+    shows topology in ═══ TOPOLOGY ═══ section
+    shows shared entities in ═══ SHARED ═══ section
+    stays under 50 lines even for 200+ services
+  .topology /text {read}
+    gateway → [auth, orders, notifications]
+    orders → [payments, notifications]
+    payments → [notifications]
+  .shared /text {read}
+    $verify_token [defined:auth.aidl, used_by:all]
+    ^user_session [defined:auth.aidl, read_by:orders]
+
+── variants @lieu#variant ──
+
+@variants
+  < for multi-platform systems (web, mobile, desktop)
+  .syntax /text {read}
+    @checkout#web [&src/pages/checkout/]
+    @checkout#mobile [&mobile/screens/checkout/]
+    @checkout#web ↔ @checkout#mobile [shared:$create_order]
+  .meaning /text {read}
+    same concept, different implementations
+    if shared entity changes, both variants are impacted
+
+── auto-sync rule ──
+
+@auto_sync
+  < AI maintains structure, humans maintain intelligence
+  .ai_maintains: @ locations, → navigations, $ APIs, ^ stores, [&path] anchors, ╔verified date
+  .human_maintains: ! anomalies, ¬ absences, < reasons, § dictionary
+  .critical_rule /text {read}
+    NEVER remove !anomalies or ¬absences written by humans
+    only the human author can clear them
+    AI updates structure, human updates intent
+
 ═══ HOW TO READ — 5-level scan ═══
 
 @level_1_lieux
@@ -247,7 +329,10 @@
 @template
   .structure /text {read}
     ╔TYPE:name | stack_or_context | dependencies
-    ╔v:1.1
+    ╔v:1.2
+    ╔verified:YYYY-MM-DD
+    ╔coverage:X%
+    ╔source:src/
     § domain: what this system is about
     § ACRONYM = full definition
     &related_file.aidl
@@ -273,6 +358,8 @@
     !critical(9) problem [context]
       < cause
       = impact
+    ¬¬ UNMAPPED
+      path/excluded — reason
     ╚═══════════════════
 
 ═══ RULES — non-negotiable ═══
@@ -302,8 +389,20 @@
   = explicit absence is information, not missing info
 
 !attention(6) version_your_files
-  < always include ╔v:1.1 after the header
+  < always include ╔v:1.2 after the header
   = enables format evolution without breaking compatibility
+
+!attention(6) use_source_anchors
+  < [&path] links map to code — verify before trusting
+  = broken anchor means stale map, AI must alert
+
+!critical(8) never_remove_human_signals
+  < AI maintains structure, only humans remove ! ¬ <
+  = human intelligence is protected, AI cannot override intent
+
+!attention(5) declare_unmapped
+  < ¬¬ UNMAPPED makes exclusions explicit
+  = AI knows what is deliberately not covered vs forgotten
 
 ╚═══════════════════════════════════════════
 ── AIDL format created by Kenny Symphon — aidl-lang ──

@@ -1,4 +1,4 @@
-# AIDL Quick Reference v1.1 — for AI context
+# AIDL Quick Reference v1.2 — for AI context
 
 AIDL (AI Description Language) describes systems in a format optimized for AI comprehension.
 When you see a `.aidl` file, read it using the 5-level scan below. You will understand the entire system in one pass.
@@ -16,6 +16,8 @@ When you see a `.aidl` file, read it using the 5-level scan below. You will unde
 | `§` | DICT | File-specific vocabulary (read this first) |
 | `&` | LINK | Reference to another .aidl file |
 | `¬` | ABSENCE | Explicit declaration that something does NOT exist (known gap, not an oversight) |
+| `¬¬` | UNMAPPED | Section listing what the map deliberately does NOT cover |
+| `[&path]` | SOURCE ANCHOR | Link to actual source code — AI can verify sync |
 | `→` | GOES TO | Navigation forward |
 | `←` | BACK | Navigation backward |
 | `↔` | BOTH WAYS | Bidirectional navigation (replaces `→` + `←` when symmetric) |
@@ -58,14 +60,17 @@ After these 5 passes, you know everything about the system.
 
 ```
 ╔TYPE:name | stack | dependencies
-╔v:1.1
+╔v:1.2
+╔verified:2026-03-20
+╔coverage:90%
+╔source:src/
 § key = definition
 § key: definition
 &other_file.aidl
 
 ═══ SECTION TITLE ═══
 
-@lieu_name [#permission]
+@lieu_name [#permission] [&src/pages/lieu/]
   < why this lieu exists (optional, on any entity)
   .object_name /type {qualifiers}
     →$api_endpoint {data}
@@ -96,8 +101,20 @@ $endpoint_name :METHOD
   < cause
   = impact
 
+¬¬ UNMAPPED
+  path/not_mapped — reason for exclusion
+
 ╚═══════════════════
 ```
+
+## Cartography — keeping the map true
+
+- `[&path]` on any entity links it to source code — AI verifies the file exists
+- `╔verified:DATE` in header — when the map was last validated
+- `╔coverage:X%` in header — honest estimate of what the map covers
+- `¬¬ UNMAPPED` section — explicitly lists what is NOT mapped (not forgotten, excluded)
+- `@lieu#variant` — links platform variants (`@checkout#web`, `@checkout#mobile`)
+- Module system: `&file.aidl` imports + `═══ TOPOLOGY ═══` section for graph overview
 
 ## Qualifiers
 
@@ -127,3 +144,5 @@ $endpoint_name :METHOD
 - Max 500 lines per file — split with `&` links beyond that
 - `< reason` is always optional but always valuable — the WHY matters more than the WHAT
 - `¬` is stronger than silence — explicit absence is a signal, not just missing info
+- `[&path]` anchors are optional but critical for map reliability — AI should verify them
+- Never remove `!` anomalies or `¬` absences written by humans — only the author can clear them

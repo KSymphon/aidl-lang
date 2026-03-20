@@ -222,6 +222,24 @@ See [`examples/`](./examples):
 
 Born from daily experience working with AI on real software projects. Not from a research lab — from the field.
 
+## Changelog
+
+### v1.2 — Reliable cartography (March 2026)
+- `[&path]` **source anchors** — link any entity to its actual source code, AI verifies sync
+- `╔verified` / `╔coverage` — header metadata for map freshness and coverage
+- `¬¬ UNMAPPED` — explicitly declare what the map does NOT cover
+- **Module system** — `&file.aidl` imports + `═══ TOPOLOGY ═══` for large systems (40+ locations)
+- `@lieu#variant` — link platform variants (web, mobile, desktop)
+- **Auto-sync rules** — AI maintains structure, humans maintain intent (`!`, `¬`, `<` protected)
+
+### v1.1 — Core language (March 2026)
+- 9 entity prefixes (`@` `.` `$` `^` `~` `!` `§` `&` `¬`)
+- 10 relation operators (`→` `←` `↔` `>>` `=>` `::` `?` `>` `<` `[&]`)
+- 5-level reading system
+- Signal priority `!critical(9)`
+- Temporal qualifiers on flux `[every:X]` `[cron:X]`
+- Parser with 66 tests, CLI, formatter
+
 ## Note
 
 Not related to Android's AIDL (Android Interface Definition Language). This is a new, independent language designed for AI systems.

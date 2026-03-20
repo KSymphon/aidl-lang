@@ -16,7 +16,7 @@ Ce n'est pas un format de données (JSON, YAML). Ce n'est pas un langage de prog
 
 **Extension de fichier :** `.aidl`
 **Encodage :** UTF-8
-**Version du format :** 1.1
+**Version du format :** 1.2
 **Taille maximale :** 500 lignes par fichier (au-delà, découper avec des liens `&`)
 
 ---
@@ -38,6 +38,7 @@ Ces symboles ne changent JAMAIS. Ils sont valables dans TOUS les fichiers .aidl,
 | `§` | DICTIONNAIRE | Déclaration de codes spécifiques au fichier. Toujours après l'en-tête `╔`. Définit le vocabulaire propre à ce fichier. |
 | `&` | LIEN | Référence vers un autre fichier .aidl. L'IA sait : "plus de détails disponibles dans ce fichier". |
 | `¬` | ABSENCE | Déclaration explicite qu'une chose N'EXISTE PAS. L'IA sait : "cette absence est connue et documentée, ce n'est pas un oubli". |
+| `¬¬` | UNMAPPED | Section dédiée listant ce que la carte ne couvre PAS volontairement. L'IA sait : "ces parties existent mais sont hors périmètre". |
 
 ### Opérateurs de relation (ce qui relie)
 
@@ -51,6 +52,7 @@ Ces symboles ne changent JAMAIS. Ils sont valables dans TOUS les fichiers .aidl,
 | `?` | CONDITION | Branchement logique. "Si cette condition est vraie, alors..." |
 | `>` | ALIMENTE | Un store ou flux pousse des données vers un composant. |
 | `↔` | BIDIRECTIONNEL | Navigation dans les deux sens entre deux lieux. Remplace `→` + `←` quand la relation est symétrique. |
+| `[&path]` | ANCRE SOURCE | Lien vers le code réel correspondant. L'IA peut vérifier que la carte est synchronisée avec le code. |
 
 ### Marqueurs de permission (qui peut)
 
@@ -155,7 +157,11 @@ Les flux `~` peuvent porter des qualificateurs de temporalité pour indiquer **q
 
 | Élément | Signification exacte |
 |---------|---------------------|
-| `╔` | Début du fichier. Suivi du type et de l'identifiant. Ligne suivante optionnelle : `╔v:X.Y` pour la version du format. |
+| `╔` | Début du fichier. Suivi du type et de l'identifiant. |
+| `╔v:X.Y` | Version du format utilisé. |
+| `╔verified:DATE` | Dernière date de vérification de la carte. L'IA sait quand la carte a été validée. |
+| `╔coverage:X%` | Pourcentage estimé du système couvert par la carte. 100% = tout est cartographié. |
+| `╔source:path/` | Racine du code source correspondant à cette carte. |
 | `╚` | Fin du fichier. Signal que tout a été lu. |
 | `═══ titre ═══` | Séparation de niveau (section majeure) |
 | `── titre ──` | Séparation de sous-section |
@@ -278,6 +284,119 @@ $nom_endpoint :MÉTHODE
 
 ---
 
+## Cartographie fiable — Garder la carte synchronisée
+
+AIDL est une carte. Une carte fausse est pire que pas de carte. Ces mécanismes garantissent que la carte reste fidèle au territoire.
+
+### Ancres source `[&path]`
+
+Chaque entité peut être liée au code réel qu'elle décrit. L'IA peut vérifier que le fichier ou dossier existe encore et correspond à la description.
+
+```
+@checkout [#authenticated] 🔒 [&src/pages/checkout/]
+  .cart [&src/components/Cart.tsx]
+  →$create_order [&src/api/orders.ts:createOrder]
+
+^store_cart [zustand] [&src/stores/cart.ts]
+```
+
+Si le fichier référencé est renommé, déplacé ou supprimé, l'ancre est cassée → l'IA le détecte et alerte.
+
+### Métadonnées de fraîcheur
+
+L'en-tête du fichier peut déclarer quand la carte a été vérifiée et ce qu'elle couvre :
+
+```
+╔A:shopflow | next.js 15 | supabase, zustand, stripe
+╔v:1.2
+╔verified:2026-03-20
+╔coverage:85%
+╔source:src/
+```
+
+- `verified` — dernière date de validation (par un humain ou une IA)
+- `coverage` — estimation honnête. 85% signifie que 15% du système n'est pas cartographié
+- `source` — racine du code pour que l'IA sache où vérifier
+
+### Section `¬¬ UNMAPPED`
+
+Déclare explicitement ce que la carte **ne couvre pas**. Sans cette section, l'IA ne peut pas distinguer un oubli d'une exclusion volontaire.
+
+```
+¬¬ UNMAPPED
+  /api/internal/* — debug endpoints, internal only
+  /admin/feature-flags — feature flag management UI
+  src/legacy/* — deprecated code, removal planned Q3
+```
+
+### Module system — Pour les grands systèmes
+
+Au-delà de 40 lieux, un seul fichier devient illisible. Le fichier maître importe des sous-cartes et montre la topologie :
+
+```
+╔A:platform | microservices | k8s
+╔v:1.2
+
+═══ MODULES ═══
+&auth.aidl        — authentication, tokens, sessions
+&orders.aidl      — order lifecycle, payments
+&notifications.aidl — email, push, sms
+&inventory.aidl   — stock, suppliers
+
+═══ TOPOLOGY ═══
+auth        → [gateway]
+gateway     → [orders, inventory, notifications]
+orders      → [payments, notifications]
+payments    → [notifications]
+inventory   → [suppliers]
+
+═══ SHARED ═══
+$verify_token [defined:auth.aidl, used_by:all]
+^user_session [defined:auth.aidl, read_by:orders, inventory]
+
+╚═══════════════════
+```
+
+La `TOPOLOGY` donne la vue graphe en quelques lignes. Chaque module a le détail dans son propre fichier. Le fichier maître reste sous 50 lignes même pour un système de 200 services.
+
+### Variantes `@lieu#variant`
+
+Pour les systèmes multi-plateforme (web, mobile, desktop), les variantes lient les versions d'un même lieu :
+
+```
+@checkout#web [&src/pages/checkout/]
+  .cart {read}
+  .stripe_form {write}
+
+@checkout#mobile [&mobile/screens/checkout/]
+  .cart {read}
+  .apple_pay {write}
+  .google_pay {write}
+
+@checkout#web ↔ @checkout#mobile [shared:$create_order]
+```
+
+L'IA sait que `@checkout#web` et `@checkout#mobile` sont le **même concept** avec des implémentations différentes. Si `$create_order` change, les deux variantes sont impactées.
+
+### Auto-synchronisation par l'IA
+
+La meilleure garantie de fiabilité est que l'IA qui travaille sur le code **maintienne aussi la carte**. Dans le `CLAUDE.md` du projet :
+
+```
+Lis AIDL-SYSTEM.aidl puis project.aidl au début de chaque conversation.
+
+Après toute modification d'architecture (routes, APIs, stores, permissions) :
+1. Mets à jour project.aidl pour refléter le changement
+2. Mets à jour la date ╔verified
+3. Si une ancre [&path] est cassée, corrige-la ou signale-la
+
+Ne supprime JAMAIS les !anomalies ou ¬absences — seul l'auteur humain peut les retirer.
+```
+
+La règle "ne supprime jamais les anomalies" est critique : l'IA maintient la structure, mais **l'intelligence humaine est protégée**. Si un humain a écrit `!critical $checkout [no auth]`, l'IA ne peut pas le supprimer — c'est à l'humain de confirmer que le problème est résolu.
+
+---
+
 ## Les 5 niveaux de lecture
 
 Quand tu lis un fichier .aidl, procède dans cet ordre :
@@ -356,7 +475,10 @@ Quand tu reçois un fichier .aidl dans ton contexte :
 
 ```
 ╔A:nom_application | stack_technique | dépendances
-╔v:1.1
+╔v:1.2
+╔verified:2026-03-20
+╔coverage:90%
+╔source:src/
 § domaine: description du domaine métier
 § cible: qui utilise cette application
 § état: phase actuelle (dev, beta, production)
@@ -371,7 +493,7 @@ Quand tu reçois un fichier .aidl dans ton contexte :
     →@autre_lieu
   →@lieu_a →@lieu_b →@lieu_c
 
-@lieu_protégé [#authentifié] 🔒
+@lieu_protégé [#authentifié] 🔒 [&src/pages/lieu/]
   < raison d'existence de ce lieu
   .contenu /type {lecture}
   .action /type {écriture}
@@ -415,6 +537,9 @@ $nom_endpoint :POST
 !attention(3) nom_problème_mineur [contexte]
   < cause
   = impact
+
+¬¬ UNMAPPED
+  chemin/non_cartographié — raison de l'exclusion
 
 ╚═══════════════════════════════════════════
 ```
