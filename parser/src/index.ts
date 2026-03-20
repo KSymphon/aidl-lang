@@ -8,6 +8,7 @@
 
 export { parse } from './parser.js';
 export { validate } from './validator.js';
+export { resolveProject } from './resolver.js';
 export type * from './types.js';
 
 import { parse } from './parser.js';

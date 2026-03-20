@@ -13,6 +13,7 @@
 import { readFileSync, readdirSync } from 'fs';
 import { resolve, basename } from 'path';
 import { parseAndValidate } from './index.js';
+import { resolveProject } from './resolver.js';
 import type { AIDLDocument, ValidationResult } from './types.js';
 
 const COLORS = {
@@ -154,8 +155,9 @@ console.log(`\n${COLORS.bold}  ═══ product-medical-equipment ═══${CO
 const med = loadExample('product-medical-equipment.aidl');
 assert(med.doc.header.fileType === 'produit', 'Type: produit');
 assert(med.doc.header.name === 'ergopro-x3', 'Nom: ergopro-x3');
-assert(med.doc.signaux.length === 3, `3 signaux d'attention (trouvé ${med.doc.signaux.length})`);
-assert(med.doc.signaux.every(s => s.level === 'attention'), 'Tous les signaux sont !attention');
+assert(med.doc.signaux.length === 4, `4 signaux (trouvé ${med.doc.signaux.length})`);
+assert(med.doc.signaux.filter(s => s.level === 'attention').length === 3, '3 signaux !attention');
+assert(med.doc.signaux.filter(s => s.level === 'critique').length === 1, '1 signal !critical (→ critique)');
 assert(med.doc.signaux.every(s => s.cause !== undefined), 'Tous les signaux ont une cause');
 assert(med.doc.signaux.every(s => s.impact !== undefined), 'Tous les signaux ont un impact');
 assert(med.validation.valid, 'Validation: VALIDE');
@@ -1025,6 +1027,200 @@ const { validation: invalidVal } = parseAndValidate(invalidSource);
 // Le validator devrait détecter le lieu sans permission
 const permIssues = invalidVal.issues.filter(i => i.rule === 'lieu_permission_missing');
 assert(permIssues.length >= 1, `Validation: détecte lieu sans permission (trouvé ${permIssues.length} issues)`);
+
+// ══════════════════════════════════════
+// TEST 25: Multi-modules — résolution de projet complet (625 lignes)
+// ══════════════════════════════════════
+
+console.log(`\n${COLORS.bold}  ═══ Multi-modules: résolution projet 625 lignes ═══${COLORS.reset}\n`);
+
+const modulesDir = resolve(import.meta.dirname, '../../tests/modules');
+const masterPath = resolve(modulesDir, 'platform.aidl');
+const project = resolveProject(masterPath);
+
+// Le fichier maître a 6 liens &
+assert(project.master.links.length === 6, `Modules: 6 liens & dans le master (trouvé ${project.master.links.length})`);
+
+// Tous les modules sont chargés
+assert(project.modules.length === 6, `Modules: 6 modules résolus (trouvé ${project.modules.length})`);
+
+// Aucune erreur de module manquant
+const notFound = project.issues.filter(i => i.rule === 'module_not_found');
+assert(notFound.length === 0, `Modules: 0 module manquant (trouvé ${notFound.length})`);
+
+// Stats fusionnées
+const ms = project.validation.stats;
+assert(ms.lignes > 600, `Modules: >600 lignes total (trouvé ${ms.lignes})`);
+
+// ══════════════════════════════════════
+// TEST 26: Multi-modules — fusion des lieux
+// ══════════════════════════════════════
+
+console.log(`\n${COLORS.bold}  ═══ Multi-modules: fusion des lieux ═══${COLORS.reset}\n`);
+
+// Lieux du master + tous les modules
+assert(ms.lieux >= 25, `Modules: ≥25 lieux fusionnés (trouvé ${ms.lieux})`);
+
+// Vérifier que des lieux de chaque module sont présents
+const mergedLieuNames = project.merged.lieux.map(l => l.name);
+assert(mergedLieuNames.includes('api_gateway'), 'Modules: @api_gateway (master)');
+assert(mergedLieuNames.includes('auth_login'), 'Modules: @auth_login (auth.aidl)');
+assert(mergedLieuNames.includes('user_list'), 'Modules: @user_list (users.aidl)');
+assert(mergedLieuNames.includes('product_catalog'), 'Modules: @product_catalog (products.aidl)');
+assert(mergedLieuNames.includes('order_list'), 'Modules: @order_list (orders.aidl)');
+assert(mergedLieuNames.includes('dashboard'), 'Modules: @dashboard (analytics.aidl)');
+assert(mergedLieuNames.includes('notification_center'), 'Modules: @notification_center (notifications.aidl)');
+
+// ══════════════════════════════════════
+// TEST 27: Multi-modules — fusion des APIs
+// ══════════════════════════════════════
+
+console.log(`\n${COLORS.bold}  ═══ Multi-modules: fusion des APIs ═══${COLORS.reset}\n`);
+
+assert(ms.portes >= 20, `Modules: ≥20 portes API fusionnées (trouvé ${ms.portes})`);
+
+const mergedPorteNames = project.merged.portes.map(p => p.name);
+assert(mergedPorteNames.includes('authenticate'), 'Modules: $authenticate (auth.aidl)');
+assert(mergedPorteNames.includes('create_order'), 'Modules: $create_order (orders.aidl)');
+assert(mergedPorteNames.includes('create_product'), 'Modules: $create_product (products.aidl)');
+assert(mergedPorteNames.includes('update_user'), 'Modules: $update_user (users.aidl)');
+assert(mergedPorteNames.includes('save_dashboard'), 'Modules: $save_dashboard (analytics.aidl)');
+
+// ══════════════════════════════════════
+// TEST 28: Multi-modules — fusion des stores
+// ══════════════════════════════════════
+
+console.log(`\n${COLORS.bold}  ═══ Multi-modules: fusion des stores ═══${COLORS.reset}\n`);
+
+assert(ms.stores >= 1, `Modules: ≥1 store fusionné (trouvé ${ms.stores})`);
+// Find the session store with actual fields (from auth.aidl, not the shared reference)
+const sessionStore2 = project.merged.stores.find(s => s.name === 'session' && s.fields.length > 0);
+assert(sessionStore2 !== undefined, 'Modules: ^session avec champs existe (auth.aidl)');
+if (sessionStore2) {
+  assert(sessionStore2.technology === 'redis', 'Modules: ^session utilise redis');
+  assert(sessionStore2.fields.length >= 6, `Modules: ^session ≥6 champs (trouvé ${sessionStore2.fields.length})`);
+} else {
+  // If no session with fields found, check if session exists at all
+  const anySession = project.merged.stores.find(s => s.name === 'session');
+  assert(anySession !== undefined, 'Modules: ^session existe (auth.aidl)');
+  assert(false, 'Modules: ^session utilise redis');
+  assert(false, `Modules: ^session ≥6 champs (trouvé 0)`);
+}
+
+// ══════════════════════════════════════
+// TEST 29: Multi-modules — fusion des flux
+// ══════════════════════════════════════
+
+console.log(`\n${COLORS.bold}  ═══ Multi-modules: fusion des flux ═══${COLORS.reset}\n`);
+
+assert(ms.flux >= 10, `Modules: ≥10 flux fusionnés (trouvé ${ms.flux})`);
+
+const mergedFluxNames = project.merged.flux.map(f => f.name);
+assert(mergedFluxNames.includes('session_cleanup'), 'Modules: ~session_cleanup (auth.aidl)');
+assert(mergedFluxNames.includes('order_fulfillment'), 'Modules: ~order_fulfillment (orders.aidl)');
+assert(mergedFluxNames.includes('product_search_sync'), 'Modules: ~product_search_sync (products.aidl)');
+assert(mergedFluxNames.includes('metrics_aggregation'), 'Modules: ~metrics_aggregation (analytics.aidl)');
+assert(mergedFluxNames.includes('email_dispatch'), 'Modules: ~email_dispatch (notifications.aidl)');
+
+// ══════════════════════════════════════
+// TEST 30: Multi-modules — fusion des signaux
+// ══════════════════════════════════════
+
+console.log(`\n${COLORS.bold}  ═══ Multi-modules: fusion des signaux ═══${COLORS.reset}\n`);
+
+assert(ms.signaux >= 15, `Modules: ≥15 signaux fusionnés (trouvé ${ms.signaux})`);
+assert(ms.critiques >= 6, `Modules: ≥6 critiques fusionnés (trouvé ${ms.critiques})`);
+assert(ms.attentions >= 9, `Modules: ≥9 attentions fusionnés (trouvé ${ms.attentions})`);
+
+// Signaux de différents modules
+const mergedSignalNames = project.merged.signaux.map(s => s.name);
+assert(mergedSignalNames.some(n => n.includes('no_waf')), 'Modules: signal no_waf (master)');
+assert(mergedSignalNames.some(n => n.includes('no_account_lockout')), 'Modules: signal no_account_lockout (auth)');
+assert(mergedSignalNames.some(n => n.includes('no_idempotency')), 'Modules: signal no_idempotency (orders)');
+assert(mergedSignalNames.some(n => n.includes('no_soft_delete')), 'Modules: signal no_soft_delete (users)');
+
+// ══════════════════════════════════════
+// TEST 31: Multi-modules — fusion des dictionnaires
+// ══════════════════════════════════════
+
+console.log(`\n${COLORS.bold}  ═══ Multi-modules: fusion dictionnaires ═══${COLORS.reset}\n`);
+
+const mergedDict = project.merged.dictionary.entries;
+const dictTermCount = Object.keys(mergedDict).length;
+assert(dictTermCount >= 10, `Modules: ≥10 termes de dictionnaire fusionnés (trouvé ${dictTermCount})`);
+
+// Termes de différents modules
+assert(mergedDict['RBAC'] !== undefined, 'Modules: dict RBAC (master + users)');
+assert(mergedDict['JWT'] !== undefined, 'Modules: dict JWT (auth)');
+assert(mergedDict['SKU'] !== undefined, 'Modules: dict SKU (products)');
+assert(mergedDict['PCI'] !== undefined, 'Modules: dict PCI (orders)');
+assert(mergedDict['KPI'] !== undefined, 'Modules: dict KPI (analytics)');
+
+// ══════════════════════════════════════
+// TEST 32: Multi-modules — détection de problèmes inter-modules
+// ══════════════════════════════════════
+
+console.log(`\n${COLORS.bold}  ═══ Multi-modules: cohérence inter-modules ═══${COLORS.reset}\n`);
+
+// Le projet est valide (pas d'erreurs)
+assert(project.validation.valid, 'Modules: projet globalement valide');
+
+// Vérifier s'il y a des doublons de lieux détectés
+const duplicateLieux = project.issues.filter(i => i.rule === 'duplicate_lieu');
+// On ne devrait pas avoir de doublons dans notre test
+// (sauf si le même nom existe dans 2 modules)
+console.log(`  ${COLORS.dim}  Doublons détectés: ${duplicateLieux.length}${COLORS.reset}`);
+
+// ══════════════════════════════════════
+// TEST 33: Multi-modules — module manquant
+// ══════════════════════════════════════
+
+console.log(`\n${COLORS.bold}  ═══ Multi-modules: module manquant ═══${COLORS.reset}\n`);
+
+// Créer un fichier master qui référence un module inexistant
+const fakeMasterSource = `╔A:broken-project | test
+&nonexistent_module.aidl
+&auth.aidl
+
+═══ L1: LIEUX ═══
+@home [#public]
+╚═══════════════════════════════════════════
+`;
+const { writeFileSync } = await import('fs');
+const fakeMasterPath = resolve(modulesDir, '_test_broken.aidl');
+writeFileSync(fakeMasterPath, fakeMasterSource);
+
+const brokenProject = resolveProject(fakeMasterPath);
+const missingModules = brokenProject.issues.filter(i => i.rule === 'module_not_found');
+assert(missingModules.length === 1, `Modules: 1 module manquant détecté (trouvé ${missingModules.length})`);
+assert(missingModules[0]?.message.includes('nonexistent_module'), 'Modules: le bon module est signalé manquant');
+
+// Le module auth.aidl est quand même chargé
+assert(brokenProject.modules.length === 1, `Modules: 1 module chargé malgré l'erreur (trouvé ${brokenProject.modules.length})`);
+assert(!brokenProject.validation.valid, 'Modules: projet invalide à cause du module manquant');
+
+// Cleanup
+const { unlinkSync } = await import('fs');
+unlinkSync(fakeMasterPath);
+
+// ══════════════════════════════════════
+// TEST 34: Validation — fichier > 500 lignes
+// ══════════════════════════════════════
+
+console.log(`\n${COLORS.bold}  ═══ Validation: fichier > 500 lignes ═══${COLORS.reset}\n`);
+
+// Générer un fichier de 550 lignes
+let bigSource = `╔A:big-app | test\n§ domain: test\n\n═══ L1: LIEUX ═══\n\n`;
+for (let i = 0; i < 100; i++) {
+  bigSource += `@page_${i} [#public]\n  .content /text {read}\n  .button /action {write}\n  →@page_${(i + 1) % 100}\n\n`;
+}
+bigSource += `╚═══════════════════════════════════════════\n`;
+
+const { validation: bigVal } = parseAndValidate(bigSource);
+const tooLongWarning = bigVal.issues.find(i => i.rule === 'file_too_long');
+assert(tooLongWarning !== undefined, 'Validation: détecte fichier > 500 lignes');
+assert(bigVal.stats.lieux === 100, `Validation: parse quand même les 100 lieux (trouvé ${bigVal.stats.lieux})`);
+assert(bigVal.stats.lignes > 500, `Validation: compte > 500 lignes (trouvé ${bigVal.stats.lignes})`);
 
 // ══════════════════════════════════════
 // RÉSULTAT

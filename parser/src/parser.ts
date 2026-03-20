@@ -27,10 +27,10 @@ const PATTERNS = {
   store:      /^\^(\S+)(.*)$/,
   porte:      /^\$(\S+)(.*)$/,
   flux:       /^~(\S+)(.*)$/,
-  signal:     /^!(critique|attention|ok|err)\s+(.+)$/,
+  signal:     /^!(critique|critical|attention|ok|err)(?:\(\d+\))?\s+(.+)$/,
   navForward: /^→(.+)$/,
   navBack:    /^←(.+)$/,
-  result:     /^!(ok|err)(.*)$/,
+  result:     /^!(ok|err)(?:\(\d+\))?(.*)$/,
   condition:  /^\?(.+?)\s*::$/,
   cause:      /^<\s*(.+)$/,
   impact:     /^=\s*(.+)$/,
@@ -252,7 +252,7 @@ export function parse(source: string): AIDLDocument {
       const name = rest.replace(/\[.*\]/, '').trim();
 
       currentSignal = {
-        level: level as SignalLevel,
+        level: (level === 'critical' ? 'critique' : level) as SignalLevel,
         name,
         context: contextMatch ? contextMatch[1].trim() : undefined,
         line: lineNum,
