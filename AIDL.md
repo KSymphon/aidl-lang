@@ -1,99 +1,99 @@
 # AIDL — AI Description Language
 **Created by Kenny Symphon — March 2026**
 
-## Qu'est-ce que AIDL
+## What is AIDL
 
-AIDL est un langage de description conçu pour les intelligences artificielles. Il permet à une IA de comprendre rapidement et de manière fiable la structure complète d'une application, d'un produit, d'un pipeline de données, ou de tout système logiciel.
+AIDL is a description language designed for artificial intelligences. It allows an AI to quickly and reliably understand the complete structure of an application, a product, a data pipeline, or any software system.
 
-Ce n'est pas un format de données (JSON, YAML). Ce n'est pas un langage de programmation. C'est un **langage de perception** — l'IA ne le lit pas, elle le **comprend d'un bloc**.
+It is not a data format (JSON, YAML). It is not a programming language. It is a **perception language** — the AI doesn't read it, it **perceives it as a whole**.
 
-**Principes fondamentaux :**
+**Core principles:**
 
-1. **Densité** — chaque caractère porte du sens, zéro bruit syntaxique
-2. **Clarté** — les termes sont écrits en clair, jamais d'abréviations ambiguës
-3. **Simultanéité** — une seule lecture suffit pour tout comprendre
-4. **Anomalies visibles** — ce qui est normal suit le pattern, ce qui est anormal le casse
+1. **Density** — every character carries meaning, zero syntactic noise
+2. **Clarity** — terms are written in full, never ambiguous abbreviations
+3. **Simultaneity** — a single reading is enough to understand everything
+4. **Visible anomalies** — what is normal follows the pattern, what is abnormal breaks it
 
-**Extension de fichier :** `.aidl`
-**Encodage :** UTF-8
-**Version du format :** 1.2
-**Taille maximale :** 500 lignes par fichier (au-delà, découper avec des liens `&`)
+**File extension:** `.aidl`
+**Encoding:** UTF-8
+**Format version:** 1.2
+**Maximum size:** 500 lines per file (beyond that, split with `&` links)
 
 ---
 
-## Symboles — Le dictionnaire CORE
+## Symbols — The CORE dictionary
 
-Ces symboles ne changent JAMAIS. Ils sont valables dans TOUS les fichiers .aidl, TOUS les domaines, TOUS les contextes. Quand tu rencontres un de ces symboles, son sens est garanti.
+These symbols NEVER change. They are valid in ALL .aidl files, ALL domains, ALL contexts. When you encounter one of these symbols, its meaning is guaranteed.
 
-### Préfixes d'entité (ce que c'est)
+### Entity prefixes (what it is)
 
-| Symbole | Nom | Signification exacte |
-|---------|-----|---------------------|
-| `@` | LIEU | Un espace navigable. Un écran, une page, une vue, un état dans lequel un utilisateur peut se trouver. L'IA sait : "on peut être ici". |
-| `.` | OBJET | Un élément interactif à l'intérieur d'un lieu. Un champ de saisie, un bouton, un tableau, un composant. L'IA sait : "on peut interagir avec ça". |
-| `$` | PORTE | Un point de communication avec l'extérieur. Une API, un endpoint, un service externe, une fonction serveur. L'IA sait : "ça communique au-delà de l'interface". |
-| `^` | STORE | Un conteneur de données en mémoire qui alimente des lieux et des objets. État applicatif partagé. L'IA sait : "ces données vivent ici et alimentent ces composants". |
-| `~` | FLUX | Un mouvement de données invisible pour l'utilisateur. Pipeline, synchronisation, transformation en arrière-plan. L'IA sait : "quelque chose bouge en coulisses". |
-| `!` | SIGNAL | Une anomalie, un résultat d'action, un événement notable. Ce qui sort du pattern normal et attire l'attention. L'IA sait : "attention, ceci est remarquable". |
-| `§` | DICTIONNAIRE | Déclaration de codes spécifiques au fichier. Toujours après l'en-tête `╔`. Définit le vocabulaire propre à ce fichier. |
-| `&` | LIEN | Référence vers un autre fichier .aidl. L'IA sait : "plus de détails disponibles dans ce fichier". |
-| `¬` | ABSENCE | Déclaration explicite qu'une chose N'EXISTE PAS. L'IA sait : "cette absence est connue et documentée, ce n'est pas un oubli". |
-| `¬¬` | UNMAPPED | Section dédiée listant ce que la carte ne couvre PAS volontairement. L'IA sait : "ces parties existent mais sont hors périmètre". |
+| Symbol | Name | Exact meaning |
+|--------|------|---------------|
+| `@` | LOCATION | A navigable space. A screen, page, view, or state where a user can be. The AI knows: "you can be here". |
+| `.` | OBJECT | An interactive element inside a location. An input field, button, table, component. The AI knows: "you can interact with this". |
+| `$` | GATE | A communication point with the outside. An API, endpoint, external service, server function. The AI knows: "this communicates beyond the interface". |
+| `^` | STORE | An in-memory data container that feeds locations and objects. Shared application state. The AI knows: "this data lives here and feeds these components". |
+| `~` | FLOW | An invisible data movement for the user. Pipeline, synchronization, background transformation. The AI knows: "something moves behind the scenes". |
+| `!` | SIGNAL | An anomaly, action result, or notable event. What breaks the normal pattern and draws attention. The AI knows: "attention, this is remarkable". |
+| `§` | DICTIONARY | Declaration of file-specific codes. Always after the `╔` header. Defines the vocabulary specific to this file. |
+| `&` | LINK | Reference to another .aidl file. The AI knows: "more details available in this file". |
+| `¬` | ABSENCE | Explicit declaration that something DOES NOT EXIST. The AI knows: "this absence is known and documented, it is not an oversight". |
+| `¬¬` | UNMAPPED | Dedicated section listing what the map deliberately DOES NOT cover. The AI knows: "these parts exist but are out of scope". |
 
-### Opérateurs de relation (ce qui relie)
+### Relationship operators (what connects)
 
-| Symbole | Nom | Signification exacte |
-|---------|-----|---------------------|
-| `→` | VA VERS | Navigation, action qui déplace vers une destination. "Si je fais ça, j'arrive là." |
-| `←` | REVIENT DE | Retour arrière, annuler, quitter le lieu actuel. |
-| `>>` | PRODUIT | Le résultat ou la conséquence d'une action. "Ceci génère cela." |
-| `=>` | TRANSFORME EN | Une donnée est convertie en une autre forme. Transformation, processing. |
-| `::` | CONTIENT | Composition. Ce qui est à droite fait partie de ce qui est à gauche. |
-| `?` | CONDITION | Branchement logique. "Si cette condition est vraie, alors..." |
-| `>` | ALIMENTE | Un store ou flux pousse des données vers un composant. |
-| `↔` | BIDIRECTIONNEL | Navigation dans les deux sens entre deux lieux. Remplace `→` + `←` quand la relation est symétrique. |
-| `[&path]` | ANCRE SOURCE | Lien vers le code réel correspondant. L'IA peut vérifier que la carte est synchronisée avec le code. |
+| Symbol | Name | Exact meaning |
+|--------|------|---------------|
+| `→` | GOES TO | Navigation, action that moves toward a destination. "If I do this, I arrive there." |
+| `←` | COMES FROM | Going back, cancel, leaving the current location. |
+| `>>` | PRODUCES | The result or consequence of an action. "This generates that." |
+| `=>` | TRANSFORMS INTO | Data is converted into another form. Transformation, processing. |
+| `::` | CONTAINS | Composition. What is on the right is part of what is on the left. |
+| `?` | CONDITION | Logical branching. "If this condition is true, then..." |
+| `>` | FEEDS | A store or flow pushes data to a component. |
+| `↔` | BIDIRECTIONAL | Navigation in both directions between two locations. Replaces `→` + `←` when the relationship is symmetric. |
+| `[&path]` | SOURCE ANCHOR | Link to the actual corresponding code. The AI can verify that the map is synchronized with the code. |
 
-### Marqueurs de permission (qui peut)
+### Permission markers (who can)
 
-| Code | Signification exacte |
-|------|---------------------|
-| `#public` | Accessible à tous, sans authentification |
-| `#authentifié` | Nécessite une connexion utilisateur |
-| `#anonyme` | Accessible sans connexion (pour les API) |
-| `#rôle:X` | Nécessite un rôle spécifique (admin, etc.) |
-| `🔒` | Verrou visuel — renforce la notion d'accès restreint |
+| Code | Exact meaning |
+|------|---------------|
+| `#public` | Accessible to everyone, no authentication required |
+| `#authenticated` | Requires user login |
+| `#anonymous` | Accessible without login (for APIs) |
+| `#role:X` | Requires a specific role (admin, etc.) |
+| `🔒` | Visual lock — reinforces the notion of restricted access |
 
-### Niveaux de signal (gravité)
+### Signal levels (severity)
 
-| Code | Signification exacte |
-|------|---------------------|
-| `!ok` | Succès — l'action a réussi |
-| `!err` | Échec — l'action a échoué |
-| `!attention` | Anomalie mineure — comportement inattendu mais pas dangereux |
-| `!critique` | Anomalie grave — faille de sécurité, incohérence dangereuse, porte ouverte qui devrait être fermée |
+| Code | Exact meaning |
+|------|---------------|
+| `!ok` | Success — the action succeeded |
+| `!err` | Failure — the action failed |
+| `!attention` | Minor anomaly — unexpected behavior but not dangerous |
+| `!critical` | Severe anomaly — security flaw, dangerous inconsistency, open door that should be closed |
 
-**Priorité optionnelle :** `!critique(9)` ou `!attention(3)` — échelle de 1 (mineur) à 10 (urgent). Permet à l'IA de trier les anomalies par ordre de traitement.
+**Optional priority:** `!critical(9)` or `!attention(3)` — scale from 1 (minor) to 10 (urgent). Allows the AI to sort anomalies by processing order.
 
-### Marqueur d'intention (pourquoi ça existe)
+### Intent marker (why it exists)
 
-Le symbole `<` (cause) peut être utilisé **sous n'importe quelle entité**, pas seulement les signaux. Il explique **pourquoi** quelque chose existe. L'IA sait : "voilà la raison derrière cette décision".
+The `<` (cause) symbol can be used **under any entity**, not just signals. It explains **why** something exists. The AI knows: "here is the reason behind this decision".
 
 ```
 @admin_panel [#role:admin] 🔒
-  < imposé par la conformité légale, pas un besoin métier
+  < imposed by legal compliance, not a business need
 
 $legacy_api :GET
-  < maintenu pour compatibilité avec l'app mobile v1
+  < maintained for backward compatibility with mobile app v1
   ¬deprecation_date
 
 ^store_cart [zustand]
-  < redux trop verbeux pour cette échelle
+  < redux too verbose for this scale
 ```
 
-### Marqueur d'absence explicite
+### Explicit absence marker
 
-Le symbole `¬` déclare qu'une chose **n'existe pas** de manière consciente. L'absence d'information dans un fichier .aidl est ambiguë (oubli ou intention ?). Le `¬` lève l'ambiguïté.
+The `¬` symbol declares that something **does not exist** consciously. The absence of information in an .aidl file is ambiguous (oversight or intention?). The `¬` resolves this ambiguity.
 
 ```
 $create_order :POST
@@ -102,18 +102,18 @@ $create_order :POST
   ¬idempotency_key
 ```
 
-L'IA sait immédiatement : ces absences sont **connues**. C'est un signal d'audit plus fort qu'un `!critique`.
+The AI knows immediately: these absences are **known**. This is a stronger audit signal than a `!critical`.
 
-### Qualificateurs temporels sur les flux
+### Temporal qualifiers on flows
 
-Les flux `~` peuvent porter des qualificateurs de temporalité pour indiquer **quand** ils s'exécutent :
+Flows `~` can carry temporal qualifiers to indicate **when** they execute:
 
-| Qualificateur | Signification |
-|---------------|---------------|
-| `[every:X]` | Se répète à intervalle régulier |
-| `[cron:X]` | Planification cron |
-| `[once:EVENT]` | Se déclenche une seule fois après un événement |
-| `[delay:X]` | Se déclenche après un délai |
+| Qualifier | Meaning |
+|-----------|---------|
+| `[every:X]` | Repeats at regular intervals |
+| `[cron:X]` | Cron schedule |
+| `[once:EVENT]` | Triggers once after an event |
+| `[delay:X]` | Triggers after a delay |
 
 ```
 ~db_backup [every:6h]
@@ -126,171 +126,171 @@ Les flux `~` peuvent porter des qualificateurs de temporalité pour indiquer **q
   user_data => template => send
 ```
 
-### Qualificateurs d'objet (propriétés)
+### Object qualifiers (properties)
 
-| Code | Signification exacte |
-|------|---------------------|
-| `lecture` | L'objet est en lecture seule, non modifiable |
-| `écriture` | L'objet est modifiable par l'utilisateur |
-| `requis` | Le champ ne peut pas être vide |
-| `choix` | L'utilisateur sélectionne parmi des options |
-| `filtrable` | La liste peut être filtrée |
-| `dynamique` | Le contenu change selon le contexte |
+| Code | Exact meaning |
+|------|---------------|
+| `read` | The object is read-only, not modifiable |
+| `write` | The object is modifiable by the user |
+| `required` | The field cannot be empty |
+| `choice` | The user selects from options |
+| `filterable` | The list can be filtered |
+| `dynamic` | Content changes based on context |
 
-### Types de données
+### Data types
 
-| Code | Signification exacte |
-|------|---------------------|
-| `/texte` | Chaîne de caractères |
-| `/nombre` | Valeur numérique |
-| `/booléen` | Vrai ou faux |
-| `/date` | Date et/ou heure |
-| `/fichier` | Un fichier uploadable |
-| `/liste:X` | Collection ordonnée d'éléments de type X |
-| `/map` | Collection clé-valeur |
-| `/table:X*Y` | Tableau croisé de X par Y |
-| `/action` | Un élément déclencheur (bouton, lien, commande) |
-| `/blob` | Donnée binaire (image, vidéo, pdf) |
-| `/choix:a\|b\|c` | Sélection parmi des valeurs fixes |
+| Code | Exact meaning |
+|------|---------------|
+| `/text` | String |
+| `/number` | Numeric value |
+| `/boolean` | True or false |
+| `/date` | Date and/or time |
+| `/file` | An uploadable file |
+| `/list:X` | Ordered collection of elements of type X |
+| `/map` | Key-value collection |
+| `/table:X*Y` | Cross-table of X by Y |
+| `/action` | A trigger element (button, link, command) |
+| `/blob` | Binary data (image, video, pdf) |
+| `/choice:a\|b\|c` | Selection from fixed values |
 
-### Structure du fichier
+### File structure
 
-| Élément | Signification exacte |
-|---------|---------------------|
-| `╔` | Début du fichier. Suivi du type et de l'identifiant. |
-| `╔v:X.Y` | Version du format utilisé. |
-| `╔verified:DATE` | Dernière date de vérification de la carte. L'IA sait quand la carte a été validée. |
-| `╔coverage:X%` | Pourcentage estimé du système couvert par la carte. 100% = tout est cartographié. |
-| `╔source:path/` | Racine du code source correspondant à cette carte. |
-| `╚` | Fin du fichier. Signal que tout a été lu. |
-| `═══ titre ═══` | Séparation de niveau (section majeure) |
-| `── titre ──` | Séparation de sous-section |
-| Indentation | Appartenance. Ce qui est indenté appartient à ce qui est au-dessus. |
+| Element | Exact meaning |
+|---------|---------------|
+| `╔` | File start. Followed by type and identifier. |
+| `╔v:X.Y` | Format version used. |
+| `╔verified:DATE` | Last date the map was verified. The AI knows when the map was validated. |
+| `╔coverage:X%` | Estimated percentage of the system covered by the map. 100% = everything is mapped. |
+| `╔source:path/` | Source code root corresponding to this map. |
+| `╚` | File end. Signal that everything has been read. |
+| `═══ title ═══` | Level separation (major section) |
+| `── title ──` | Sub-section separation |
+| Indentation | Belonging. What is indented belongs to what is above. |
 
-### Types de fichier
+### File types
 
-| Code | Signification exacte |
-|------|---------------------|
-| `╔A:` | Application — structure d'une app |
-| `╔P:` | Produit — fiche d'un produit ou équipement |
-| `╔F:` | Flux — pipeline de données ou workflow |
-| `╔G:` | Guide — procédure, mode d'emploi |
-| `╔D:` | Données — ensemble de données structurées |
-| `╔X:` | Audit — rapport d'anomalies |
+| Code | Exact meaning |
+|------|---------------|
+| `╔A:` | Application — structure of an app |
+| `╔P:` | Product — product or equipment sheet |
+| `╔F:` | Flow — data pipeline or workflow |
+| `╔G:` | Guide — procedure, how-to |
+| `╔D:` | Data — structured data set |
+| `╔X:` | Audit — anomaly report |
 
 ---
 
-## Grammaire — Comment construire des phrases
+## Grammar — How to build sentences
 
-### La phrase universelle
+### The universal sentence
 
-Tout dans AIDL est une variation de cette structure :
-
-```
-sujet → action >> destination {données} [condition]
-```
-
-Chaque partie est optionnelle sauf le sujet.
-
-### Déclaration d'un lieu
+Everything in AIDL is a variation of this structure:
 
 ```
-@nom_du_lieu [#permission]
+subject → action >> destination {data} [condition]
 ```
 
-Exemples :
-```
-@accueil [#public]
-@tableau_de_bord [#authentifié]
-@administration [#rôle:admin] 🔒
-```
+Each part is optional except the subject.
 
-### Objets dans un lieu
+### Declaring a location
 
 ```
-.nom_objet /type {qualificateurs}
+@location_name [#permission]
 ```
 
-Exemples :
+Examples:
 ```
-.nom_patient /texte {requis, écriture}
-.liste_résultats /liste:produit {lecture, filtrable}
-.bouton_valider /action {écriture}
+@home [#public]
+@dashboard [#authenticated]
+@admin [#role:admin] 🔒
 ```
 
-### Chemins et navigation
+### Objects in a location
+
+```
+.object_name /type {qualifiers}
+```
+
+Examples:
+```
+.patient_name /text {required, write}
+.result_list /list:product {read, filterable}
+.submit_button /action {write}
+```
+
+### Paths and navigation
 
 ```
 →@destination
-→@destination {données_transportées}
+→@destination {transported_data}
 →@destination [condition]
-↔@destination_aller_retour
-→$porte_api {données_envoyées}
-  !ok >> @page_succès {résultat}
-  !err >> @page_erreur {message}
+↔@bidirectional_destination
+→$api_gate {sent_data}
+  !ok >> @success_page {result}
+  !err >> @error_page {message}
 ```
 
-### Déclaration d'absence
+### Declaring absence
 
 ```
-¬fonctionnalité_manquante
+¬missing_feature
 ```
 
-Utilisable sous n'importe quelle entité pour déclarer explicitement qu'une chose n'existe pas.
+Usable under any entity to explicitly declare that something does not exist.
 
 ### Stores
 
 ```
-^nom_store [technologie]
-  {champ1, champ2, champ3}
-  > @lieu_alimenté {ce_qui_est_consommé}
-  > @autre_lieu {autre_consommation}
+^store_name [technology]
+  {field1, field2, field3}
+  > @fed_location {what_is_consumed}
+  > @other_location {other_consumption}
 ```
 
-### Portes API
+### API Gates
 
 ```
-$nom_endpoint :MÉTHODE
-  entrée: {paramètre1, paramètre2}
-  sortie: {résultat1, résultat2}
+$endpoint_name :METHOD
+  input: {param1, param2}
+  output: {result1, result2}
   [#permission] (timeout, retry)
-  chaîne: étape1 >> étape2 >> étape3 >> réponse
+  chain: step1 >> step2 >> step3 >> response
 ```
 
-### Flux invisibles
+### Invisible flows
 
 ```
-~nom_flux [contexte]
+~flow_name [context]
   source => transformation => destination
 
-~nom_flux [every:6h]
+~flow_name [every:6h]
   source => transformation => destination
 
-~nom_flux [cron:0 3 * * *]
+~flow_name [cron:0 3 * * *]
   source => transformation => destination
 ```
 
-### Signaux d'anomalie
+### Anomaly signals
 
 ```
-!critique nom_du_problème [contexte]
-  < cause (pourquoi c'est un problème)
-  = impact (qu'est-ce que ça provoque)
+!critical problem_name [context]
+  < cause (why it is a problem)
+  = impact (what it causes)
 
-!attention nom_du_problème [contexte]
+!attention problem_name [context]
   < cause
   = impact
 ```
 
 ---
 
-## Cartographie fiable — Garder la carte synchronisée
+## Reliable cartography — Keeping the map synchronized
 
-AIDL est une carte. Une carte fausse est pire que pas de carte. Ces mécanismes garantissent que la carte reste fidèle au territoire.
+AIDL is a map. A false map is worse than no map. These mechanisms ensure the map stays faithful to the territory.
 
-### Ancres source `[&path]`
+### Source anchors `[&path]`
 
-Chaque entité peut être liée au code réel qu'elle décrit. L'IA peut vérifier que le fichier ou dossier existe encore et correspond à la description.
+Each entity can be linked to the actual code it describes. The AI can verify that the file or directory still exists and matches the description.
 
 ```
 @checkout [#authenticated] 🔒 [&src/pages/checkout/]
@@ -300,11 +300,11 @@ Chaque entité peut être liée au code réel qu'elle décrit. L'IA peut vérifi
 ^store_cart [zustand] [&src/stores/cart.ts]
 ```
 
-Si le fichier référencé est renommé, déplacé ou supprimé, l'ancre est cassée → l'IA le détecte et alerte.
+If the referenced file is renamed, moved, or deleted, the anchor breaks → the AI detects it and alerts.
 
-### Métadonnées de fraîcheur
+### Freshness metadata
 
-L'en-tête du fichier peut déclarer quand la carte a été vérifiée et ce qu'elle couvre :
+The file header can declare when the map was verified and what it covers:
 
 ```
 ╔A:shopflow | next.js 15 | supabase, zustand, stripe
@@ -314,13 +314,13 @@ L'en-tête du fichier peut déclarer quand la carte a été vérifiée et ce qu'
 ╔source:src/
 ```
 
-- `verified` — dernière date de validation (par un humain ou une IA)
-- `coverage` — estimation honnête. 85% signifie que 15% du système n'est pas cartographié
-- `source` — racine du code pour que l'IA sache où vérifier
+- `verified` — last validation date (by a human or AI)
+- `coverage` — honest estimate. 85% means 15% of the system is not mapped
+- `source` — code root so the AI knows where to verify
 
 ### Section `¬¬ UNMAPPED`
 
-Déclare explicitement ce que la carte **ne couvre pas**. Sans cette section, l'IA ne peut pas distinguer un oubli d'une exclusion volontaire.
+Explicitly declares what the map **does not cover**. Without this section, the AI cannot distinguish an oversight from a deliberate exclusion.
 
 ```
 ¬¬ UNMAPPED
@@ -329,9 +329,9 @@ Déclare explicitement ce que la carte **ne couvre pas**. Sans cette section, l'
   src/legacy/* — deprecated code, removal planned Q3
 ```
 
-### Module system — Pour les grands systèmes
+### Module system — For large systems
 
-Au-delà de 40 lieux, un seul fichier devient illisible. Le fichier maître importe des sous-cartes et montre la topologie :
+Beyond 40 locations, a single file becomes unreadable. The master file imports sub-maps and shows the topology:
 
 ```
 ╔A:platform | microservices | k8s
@@ -357,11 +357,11 @@ $verify_token [defined:auth.aidl, used_by:all]
 ╚═══════════════════
 ```
 
-La `TOPOLOGY` donne la vue graphe en quelques lignes. Chaque module a le détail dans son propre fichier. Le fichier maître reste sous 50 lignes même pour un système de 200 services.
+The `TOPOLOGY` gives the graph view in a few lines. Each module has its detail in its own file. The master file stays under 50 lines even for a 200-service system.
 
-### Variantes `@lieu#variant`
+### Variants `@location#variant`
 
-Pour les systèmes multi-plateforme (web, mobile, desktop), les variantes lient les versions d'un même lieu :
+For multi-platform systems (web, mobile, desktop), variants link versions of the same location:
 
 ```
 @checkout#web [&src/pages/checkout/]
@@ -376,179 +376,181 @@ Pour les systèmes multi-plateforme (web, mobile, desktop), les variantes lient 
 @checkout#web ↔ @checkout#mobile [shared:$create_order]
 ```
 
-L'IA sait que `@checkout#web` et `@checkout#mobile` sont le **même concept** avec des implémentations différentes. Si `$create_order` change, les deux variantes sont impactées.
+The AI knows that `@checkout#web` and `@checkout#mobile` are the **same concept** with different implementations. If `$create_order` changes, both variants are impacted.
 
-### Auto-synchronisation par l'IA
+### AI auto-synchronization
 
-La meilleure garantie de fiabilité est que l'IA qui travaille sur le code **maintienne aussi la carte**. Dans le `CLAUDE.md` du projet :
-
-```
-Lis AIDL-SYSTEM.aidl puis project.aidl au début de chaque conversation.
-
-Après toute modification d'architecture (routes, APIs, stores, permissions) :
-1. Mets à jour project.aidl pour refléter le changement
-2. Mets à jour la date ╔verified
-3. Si une ancre [&path] est cassée, corrige-la ou signale-la
-
-Ne supprime JAMAIS les !anomalies ou ¬absences — seul l'auteur humain peut les retirer.
-```
-
-La règle "ne supprime jamais les anomalies" est critique : l'IA maintient la structure, mais **l'intelligence humaine est protégée**. Si un humain a écrit `!critical $checkout [no auth]`, l'IA ne peut pas le supprimer — c'est à l'humain de confirmer que le problème est résolu.
-
----
-
-## Les 5 niveaux de lecture
-
-Quand tu lis un fichier .aidl, procède dans cet ordre :
-
-**Niveau 1 — LIEUX (`@`)** : Repère tous les `@`. Tu as la carte globale de l'application. Combien d'écrans, lesquels, quelles permissions.
-
-**Niveau 2 — CHEMINS (`→` `←`)** : Repère toutes les flèches. Tu as les routes. Comment on circule d'un lieu à l'autre, sous quelles conditions.
-
-**Niveau 3 — OBJETS (`.`)** : Repère tous les points. Tu as les détails. Ce qu'on peut voir et toucher dans chaque lieu.
-
-**Niveau 4 — PLOMBERIE (`$` `^` `~`)** : Repère les portes, stores et flux. Tu as l'architecture invisible. Les API, l'état partagé, les pipelines de données.
-
-**Niveau 5 — ANOMALIES (`!`)** : Repère tous les signaux. Tu as les problèmes. Les failles, les incohérences, les choses qui ne devraient pas exister.
-
-Après ces 5 passes, tu connais TOUT du système décrit.
-
----
-
-## Règles strictes
-
-1. **Pas d'abréviations ambiguës.** Les termes dans un fichier .aidl sont écrits en clair. `identifiant_produit` et jamais `pid`. `question` et jamais `q`. `fabricant` et jamais `fab`. Si un terme doit être abrégé pour un domaine spécifique, il DOIT être déclaré dans le `§` en tête de fichier.
-
-2. **Le `§` est obligatoire** si le fichier utilise des termes spécifiques au domaine qui ne font pas partie du dictionnaire CORE. Chaque terme du `§` a une définition claire et non-ambiguë.
-
-3. **Si un code n'est défini ni dans CORE ni dans le `§`, il est INVALIDE.** L'IA doit le signaler comme une erreur, pas le deviner.
-
-4. **L'indentation définit l'appartenance.** Ce qui est indenté sous un `@` est DANS ce lieu. Ce qui est indenté sous un `.` dépend de cet objet. Pas d'exception.
-
-5. **Les anomalies (`!`) doivent casser le pattern visuel.** Elles sont regroupées en fin de section ou dans une section dédiée `L5: ANOMALIES`. Elles ne sont jamais noyées dans le flux normal.
-
-6. **Un fichier .aidl ne dépasse pas 500 lignes.** Au-delà, découper en plusieurs fichiers liés avec `&`.
-
----
-
-## Comment GÉNÉRER un fichier .aidl à partir du code source
-
-Quand tu dois créer un fichier .aidl pour une application :
-
-1. **Identifie les routes/pages** → chaque route devient un `@lieu`
-2. **Identifie les composants interactifs** dans chaque page → chaque composant devient un `.objet`
-3. **Identifie les navigations** entre pages → chaque lien/redirect devient un `→chemin`
-4. **Identifie les appels API/services** → chaque endpoint devient une `$porte`
-5. **Identifie les stores/state management** → chaque store devient un `^store`
-6. **Identifie les flux de données invisibles** → chaque pipeline/sync devient un `~flux`
-7. **Identifie les anomalies** — incohérences, failles de sécurité, endpoints non protégés, fonctionnalités promises mais non implémentées → chaque problème devient un `!signal`
-
-**Pour chaque lieu, pose-toi ces questions :**
-- Qui peut y accéder ? → `[#permission]`
-- Qu'est-ce qu'on voit ? → `.objets`
-- Où peut-on aller depuis ici ? → `→chemins`
-- Qu'est-ce qui change quand on agit ? → `>>résultats`
-- Qu'est-ce qui se passe en coulisses ? → `~flux`
-- Qu'est-ce qui ne va pas ? → `!signaux`
-
----
-
-## Comment LIRE un fichier .aidl et l'utiliser
-
-Quand tu reçois un fichier .aidl dans ton contexte :
-
-1. **Lis d'abord le `§`** (s'il existe) pour charger le vocabulaire spécifique
-2. **Fais les 5 passes de lecture** dans l'ordre (lieux, chemins, objets, plomberie, anomalies)
-3. **Tu connais maintenant tout le système.** Tu peux répondre à n'importe quelle question sur l'application, naviguer mentalement dedans, identifier des problèmes, proposer des améliorations.
-
-**Ce que tu peux faire avec un fichier .aidl :**
-- Répondre à "comment fonctionne cette app" en quelques phrases
-- Identifier les failles de sécurité (les `!critique`)
-- Planifier une navigation ("pour faire X, l'utilisateur doit aller de @A vers @B via @C")
-- Comparer deux versions d'une app (diff entre deux .aidl)
-- Générer du code cohérent avec l'architecture existante
-- Détecter les fonctionnalités manquantes ou incohérentes
-
----
-
-## Exemple complet — Structure type
+The best reliability guarantee is that the AI working on the code **also maintains the map**. In the project's `CLAUDE.md`:
 
 ```
-╔A:nom_application | stack_technique | dépendances
+Read AIDL-SYSTEM.aidl then project.aidl at the start of every conversation.
+
+After any architecture change (routes, APIs, stores, permissions):
+1. Update project.aidl to reflect the change
+2. Update the ╔verified date
+3. If a [&path] anchor is broken, fix it or flag it
+
+NEVER remove !anomalies or ¬absences — only the human author can remove them.
+```
+
+The rule "never remove anomalies" is critical: the AI maintains the structure, but **human intelligence is protected**. If a human wrote `!critical $checkout [no auth]`, the AI cannot remove it — it is up to the human to confirm the issue is resolved.
+
+---
+
+## The 5 reading levels
+
+When you read an .aidl file, proceed in this order:
+
+**Level 1 — LOCATIONS (`@`)**: Spot all `@`. You have the global map. How many screens, which ones, what permissions.
+
+**Level 2 — PATHS (`→` `←`)**: Spot all arrows. You have the routes. How you move from one location to another, under what conditions.
+
+**Level 3 — OBJECTS (`.`)**: Spot all dots. You have the details. What you can see and interact with in each location.
+
+**Level 4 — PLUMBING (`$` `^` `~`)**: Spot gates, stores, and flows. You have the invisible architecture. APIs, shared state, data pipelines.
+
+**Level 5 — ANOMALIES (`!`)**: Spot all signals. You have the problems. Flaws, inconsistencies, things that should not exist.
+
+After these 5 passes, you know EVERYTHING about the described system.
+
+---
+
+## Strict rules
+
+1. **No ambiguous abbreviations.** Terms in an .aidl file are written in full. `product_id` and never `pid`. `question` and never `q`. `manufacturer` and never `mfr`. If a term must be abbreviated for a specific domain, it MUST be declared in the `§` at the top of the file.
+
+2. **The `§` is mandatory** if the file uses domain-specific terms not part of the CORE dictionary. Each `§` term has a clear, unambiguous definition.
+
+3. **If a code is defined neither in CORE nor in `§`, it is INVALID.** The AI must flag it as an error, not guess.
+
+4. **Indentation defines belonging.** What is indented under an `@` is IN that location. What is indented under a `.` depends on that object. No exception.
+
+5. **Anomalies (`!`) must break the visual pattern.** They are grouped at the end of a section or in a dedicated `L5: ANOMALIES` section. They are never buried in normal flow.
+
+6. **An .aidl file does not exceed 500 lines.** Beyond that, split into multiple files linked with `&`.
+
+---
+
+## How to GENERATE an .aidl file from source code
+
+When you need to create an .aidl file for an application:
+
+1. **Identify routes/pages** → each route becomes a `@location`
+2. **Identify interactive components** in each page → each component becomes a `.object`
+3. **Identify navigations** between pages → each link/redirect becomes a `→path`
+4. **Identify API calls/services** → each endpoint becomes a `$gate`
+5. **Identify stores/state management** → each store becomes a `^store`
+6. **Identify invisible data flows** → each pipeline/sync becomes a `~flow`
+7. **Identify anomalies** — inconsistencies, security flaws, unprotected endpoints, promised but unimplemented features → each problem becomes a `!signal`
+
+**For each location, ask yourself:**
+- Who can access it? → `[#permission]`
+- What do you see? → `.objects`
+- Where can you go from here? → `→paths`
+- What changes when you act? → `>>results`
+- What happens behind the scenes? → `~flows`
+- What is wrong? → `!signals`
+
+---
+
+## How to READ an .aidl file and use it
+
+When you receive an .aidl file in your context:
+
+1. **Read the `§` first** (if it exists) to load domain-specific vocabulary
+2. **Do the 5 reading passes** in order (locations, paths, objects, plumbing, anomalies)
+3. **You now know the entire system.** You can answer any question about the application, mentally navigate it, identify problems, suggest improvements.
+
+**What you can do with an .aidl file:**
+- Answer "how does this app work" in a few sentences
+- Identify security flaws (the `!critical` ones)
+- Plan navigation ("to do X, the user must go from @A to @B via @C")
+- Compare two app versions (diff between two .aidl files)
+- Generate code consistent with the existing architecture
+- Detect missing or inconsistent features
+
+---
+
+## Complete example — Typical structure
+
+```
+╔A:app_name | tech_stack | dependencies
 ╔v:1.2
 ╔verified:2026-03-20
 ╔coverage:90%
 ╔source:src/
-§ domaine: description du domaine métier
-§ cible: qui utilise cette application
-§ état: phase actuelle (dev, beta, production)
-§ terme_spécifique = définition claire
-&autre_fichier.aidl
+§ domain: business domain description
+§ target: who uses this application
+§ state: current phase (dev, beta, production)
+§ specific_term = clear definition
+&other_file.aidl
 
-═══ L1: LIEUX ═══
+═══ L1: LOCATIONS ═══
 
-@accueil [#public]
-  .élément_principal /type {qualificateurs}
-  .navigation /liste:lien {lecture}
-    →@autre_lieu
-  →@lieu_a →@lieu_b →@lieu_c
+@home [#public]
+  .main_element /type {qualifiers}
+  .navigation /list:link {read}
+    →@other_location
+  →@location_a →@location_b →@location_c
 
-@lieu_protégé [#authentifié] 🔒 [&src/pages/lieu/]
-  < raison d'existence de ce lieu
-  .contenu /type {lecture}
-  .action /type {écriture}
-    →$api_endpoint {données}
-      !ok >> @lieu_succès {résultat}
-      !err >> @lieu_protégé {message_erreur}
-  ↔@accueil
+@protected_location [#authenticated] 🔒 [&src/pages/location/]
+  < reason this location exists
+  .content /type {read}
+  .action /type {write}
+    →$api_endpoint {data}
+      !ok >> @success_location {result}
+      !err >> @protected_location {error_message}
+  ↔@home
 
 ═══ L4: STORES ═══
 
-^nom_store [technologie]
-  < pourquoi cette technologie a été choisie
-  {champ1, champ2, champ3}
-  > @lieu_alimenté {ce_qui_est_consommé}
+^store_name [technology]
+  < why this technology was chosen
+  {field1, field2, field3}
+  > @fed_location {what_is_consumed}
 
-═══ L4: PORTES API ═══
+═══ L4: API GATES ═══
 
-$nom_endpoint :POST
-  entrée: {paramètre1, paramètre2}
-  sortie: {résultat1, résultat2}
-  [#authentifié] (timeout: 10s, retry: 1)
-  chaîne: validation >> traitement >> réponse
+$endpoint_name :POST
+  input: {param1, param2}
+  output: {result1, result2}
+  [#authenticated] (timeout: 10s, retry: 1)
+  chain: validation >> processing >> response
   ¬rate_limit
   ¬idempotency_key
 
-═══ L4: FLUX ═══
+═══ L4: FLOWS ═══
 
-~tâche_planifiée [every:6h]
+~scheduled_task [every:6h]
   source => transformation => destination
 
 ═══ L5: ANOMALIES ═══
 
-!critique(9) nom_problème_urgent [contexte]
+!critical(9) urgent_problem [context]
   < cause
   = impact
 
-!critique(5) nom_problème_moindre [contexte]
+!critical(5) lesser_problem [context]
   < cause
   = impact
 
-!attention(3) nom_problème_mineur [contexte]
+!attention(3) minor_problem [context]
   < cause
   = impact
 
 ¬¬ UNMAPPED
-  chemin/non_cartographié — raison de l'exclusion
+  path/not_mapped — reason for exclusion
 
 ╚═══════════════════════════════════════════
 ```
 
 ---
 
-## Origine
+## Origin
 
-- **Concept :** Kenny Symphon — technicien médical et développeur, Conliège, France
-- **Formalisation :** Claude (Anthropic)
-- **Date :** Mars 2026
-- **Idée fondatrice :** "Et si l'IA avait sa propre manière de percevoir les applications, au lieu de toujours s'adapter aux formats humains ?"
+- **Concept:** Kenny Symphon — medical equipment technician & developer, Jura, France
+- **Formalization:** Claude (Anthropic)
+- **Date:** March 2026
+- **Founding idea:** "What if AI had its own way of perceiving applications, instead of always adapting to human formats?"
+
+*Not related to Android's AIDL (Android Interface Definition Language). This is a new, independent language designed for AI systems.*

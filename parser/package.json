@@ -1,6 +1,6 @@
 {
   "name": "aidl-parser",
-  "version": "0.1.0",
+  "version": "1.2.0",
   "description": "Parser and validator for AIDL (AI Description Language)",
   "author": "Kenny Symphon",
   "license": "MIT",
