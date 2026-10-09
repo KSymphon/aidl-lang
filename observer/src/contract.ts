@@ -55,20 +55,75 @@ export const GrokDiscardSchema = z.object({
   note: z.string(),
 });
 
+export const MAX_CANDIDATES = 5;
+export const MAX_DISCARDED = 10;
+
 export const GrokScanOutputSchema = z.object({
-  candidates: z.array(GrokCandidateSchema).max(10),
-  discarded: z.array(GrokDiscardSchema).max(30),
+  candidates: z.array(GrokCandidateSchema).max(MAX_CANDIDATES),
+  discarded: z.array(GrokDiscardSchema).max(MAX_DISCARDED),
   posts_reviewed_estimate: z.number().int().nonnegative(),
   scan_notes: z.string(),
 });
 export type GrokScanOutput = z.infer<typeof GrokScanOutputSchema>;
 
+const EnvelopeSchema = z.object({
+  candidates: z.array(z.unknown()),
+  discarded: z.array(z.unknown()),
+  posts_reviewed_estimate: z.number().int().nonnegative(),
+  scan_notes: z.string(),
+});
+
+/**
+ * Validation élément par élément : un candidat hors contrat est écarté (et signalé) sans faire perdre
+ * les autres, alors que le scan a déjà été facturé.
+ */
+export function parseGrokOutput(
+  json: unknown,
+): { ok: true; output: GrokScanOutput; dropped: string[] } | { ok: false; issues: string } {
+  const env = EnvelopeSchema.safeParse(json);
+  if (!env.success) {
+    return {
+      ok: false,
+      issues: env.error.issues
+        .slice(0, 5)
+        .map((i) => `${i.path.join(".")}: ${i.message}`)
+        .join("; "),
+    };
+  }
+  const dropped: string[] = [];
+  const candidates: GrokCandidate[] = [];
+  env.data.candidates.forEach((raw, i) => {
+    const r = GrokCandidateSchema.safeParse(raw);
+    if (r.success) candidates.push(r.data);
+    else dropped.push(`candidat ${i} : ${r.error.issues.map((x) => `${x.path.join(".")} ${x.message}`).join(", ")}`);
+  });
+  if (candidates.length > MAX_CANDIDATES) {
+    dropped.push(`${candidates.length - MAX_CANDIDATES} candidat(s) au-delà de ${MAX_CANDIDATES} ignoré(s)`);
+  }
+  const discarded = env.data.discarded
+    .map((raw) => GrokDiscardSchema.safeParse(raw))
+    .filter((r) => r.success)
+    .map((r) => r.data)
+    .slice(0, MAX_DISCARDED);
+  return {
+    ok: true,
+    output: {
+      candidates: candidates.slice(0, MAX_CANDIDATES),
+      discarded,
+      posts_reviewed_estimate: env.data.posts_reviewed_estimate,
+      scan_notes: env.data.scan_notes,
+    },
+    dropped,
+  };
+}
+
 /**
  * JSON Schema envoyé à xAI (text.format json_schema, strict).
- * Écrit à la main : pas de minimum/maximum/maxItems, dont le support en mode strict n'est pas garanti ;
- * les bornes sont dans les descriptions et appliquées par zod. test/contract.test.ts vérifie la parité des clés.
+ * Écrit à la main. Les notes sont des enum 1–5 et les tableaux ont un maxItems (supportés par le moteur de
+ * sortie structurée de xAI) ; zod revérifie tout côté code. test/contract-usage.test.ts vérifie la parité des clés.
  */
 const nullableInt = (description: string) => ({ type: ["integer", "null"], description });
+const RATINGS = [1, 2, 3, 4, 5];
 const stringArray = (description: string) => ({ type: "array", items: { type: "string" }, description });
 
 export const GROK_OUTPUT_JSON_SCHEMA = {
@@ -79,6 +134,7 @@ export const GROK_OUTPUT_JSON_SCHEMA = {
     candidates: {
       type: "array",
       description: "0 à 5 candidats retenus. Zéro est une réponse normale.",
+      maxItems: MAX_CANDIDATES,
       items: {
         type: "object",
         additionalProperties: false,
@@ -111,7 +167,9 @@ export const GROK_OUTPUT_JSON_SCHEMA = {
             description: "URL exacte d'un post X réellement récupéré par x_search (https://x.com/<handle>/status/<id>). Ne jamais construire d'URL.",
           },
           evidence_summary: { type: "string", description: "Ce que montre ce post, en une ou deux phrases." },
-          other_urls: stringArray("URLs vues dans les posts (Steam, itch.io, site officiel). Vide si aucune."),
+          other_urls: stringArray(
+            "URLs lues telles quelles dans les posts récupérés (Steam, itch.io, site officiel). Ne jamais en construire. Vide si aucune.",
+          ),
           declared_followers: nullableInt("Nombre d'abonnés du créateur lu dans un résultat d'outil, sinon null."),
           declared_post_likes: nullableInt("Likes du post de preuve lus dans un résultat d'outil, sinon null."),
           declared_post_views: nullableInt("Vues du post de preuve lues dans un résultat d'outil, sinon null."),
@@ -119,9 +177,9 @@ export const GROK_OUTPUT_JSON_SCHEMA = {
           why_underexposed: { type: "string" },
           why_now: { type: "string" },
           risks: stringArray("Risques ou objections. Vide si aucun."),
-          quality: { type: "integer", description: "1 à 5 selon la grille du prompt." },
-          originality: { type: "integer", description: "1 à 5 selon la grille du prompt." },
-          story: { type: "integer", description: "1 à 5 : histoire racontable en 15–45 s." },
+          quality: { type: "integer", enum: RATINGS, description: "1 à 5 selon la grille du prompt." },
+          originality: { type: "integer", enum: RATINGS, description: "1 à 5 selon la grille du prompt." },
+          story: { type: "integer", enum: RATINGS, description: "1 à 5 : histoire racontable en 15–45 s." },
           facts: stringArray("Faits observés directement dans les résultats d'outils."),
           inferences: stringArray("Déductions ou intuitions, clairement séparées des faits."),
         },
@@ -129,7 +187,9 @@ export const GROK_OUTPUT_JSON_SCHEMA = {
     },
     discarded: {
       type: "array",
-      description: "Jusqu'à 10 exemples écartés, avec un code de raison.",
+      description:
+        "Jusqu'à 10 exemples écartés, avec un code de raison. Pour un compte écarté pour vie privée, données sensibles ou parce qu'il semble tenu par un mineur : name = \"compte écarté\", sans handle ni détail personnel.",
+      maxItems: MAX_DISCARDED,
       items: {
         type: "object",
         additionalProperties: false,

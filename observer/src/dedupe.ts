@@ -26,7 +26,31 @@ const PLATFORM_HOSTS = new Set([
   "kickstarter.com",
   "play.google.com",
   "apps.apple.com",
+  // Hôtes partagés : une page dessus n'identifie pas un projet à elle seule.
+  "s.team",
+  "store.epicgames.com",
+  "epicgames.com",
+  "gog.com",
+  "gamejolt.com",
+  "newgrounds.com",
+  "indiedb.com",
+  "google.com",
+  "patreon.com",
+  "ko-fi.com",
+  "facebook.com",
+  "threads.net",
+  "bit.ly",
+  "indiegogo.com",
+  "carrd.co",
+  "notion.site",
+  "medium.com",
+  "substack.com",
 ]);
+
+function isPlatform(host: string): boolean {
+  for (const p of PLATFORM_HOSTS) if (host === p || host.endsWith(`.${p}`)) return true;
+  return false;
+}
 
 export function keysFor(input: { x_handle: string | null; urls: string[] }): string[] {
   const keys = new Set<string>();
@@ -52,6 +76,9 @@ export function urlKey(raw: string): string | null {
   if (host === "store.steampowered.com" && parts[0] === "app" && parts[1] && /^\d+$/.test(parts[1])) {
     return `steam:${parts[1]}`;
   }
+  if (host === "s.team" && parts[0] === "a" && parts[1] && /^\d+$/.test(parts[1])) {
+    return `steam:${parts[1]}`;
+  }
   if (host.endsWith(".itch.io") && host !== "itch.io") {
     const user = host.slice(0, -".itch.io".length);
     return parts[0] ? `itch:${user}/${parts[0].toLowerCase()}` : `itch:${user}`;
@@ -67,7 +94,8 @@ export function urlKey(raw: string): string | null {
     const id = u.searchParams.get("id");
     return id ? `playstore:${id.toLowerCase()}` : null;
   }
-  if (PLATFORM_HOSTS.has(host) || host.endsWith(".x.com") || host.endsWith(".twitter.com")) return null;
+  // Dans le doute, pas de clé : une fusion à tort coûte plus cher qu'une fusion manquée.
+  if (isPlatform(host)) return null;
   return `domain:${host}`;
 }
 

@@ -7,10 +7,13 @@ const EnvSchema = z.object({
   XAI_BASE_URL: z.url().default("https://api.x.ai/v1"),
   XAI_MODEL: z.string().min(1).default("grok-4.7"),
   XAI_REASONING_EFFORT: z.enum(["none", "low", "medium", "high", "xhigh"]).default("low"),
-  // Seul levier de plafond côté requête : x_search n'a pas de max_results (voir docs/X-DISCOVERY.md).
+  // x_search n'a pas de max_results. max_turns borne les TOURS ; avec parallel_tool_calls=true, un tour peut
+  // contenir plusieurs recherches, donc ni le nombre d'appels ni le nombre de posts ne sont plafonnés.
+  // parallel_tool_calls=false = au plus un appel par tour (plafond plus strict, scan plus pauvre).
   OBSERVER_MAX_TURNS: z.coerce.number().int().min(1).max(10).default(3),
   OBSERVER_PARALLEL_TOOL_CALLS: bool.default(true),
-  OBSERVER_TIMEOUT_MS: z.coerce.number().int().min(10_000).default(300_000),
+  // Borné : le verrou de scan expire après 2 × timeout + 60 s.
+  OBSERVER_TIMEOUT_MS: z.coerce.number().int().min(10_000).max(600_000).default(300_000),
   OBSERVER_DAILY_BUDGET_USD: z.coerce.number().positive().default(5),
   // Montant réservé avant chaque scan : un scan est refusé si dépensé + réserve > budget du jour.
   OBSERVER_SCAN_RESERVE_USD: z.coerce.number().positive().default(2),

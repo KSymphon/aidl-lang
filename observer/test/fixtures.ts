@@ -113,7 +113,8 @@ export class MemoryStore implements Store {
   async readLedger() {
     return [...this.ledger];
   }
-  async appendLedger(e: LedgerEntry) {
+  async recordLedger(e: LedgerEntry) {
+    this.ledger = this.ledger.filter((x) => x.scan_id !== e.scan_id);
     this.ledger.push(e);
   }
   async readSeen() {

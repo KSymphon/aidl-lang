@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ScanReport, SuggestedDecision } from "./contract";
@@ -7,11 +8,15 @@ import type { ScanReport, SuggestedDecision } from "./contract";
  * petite pour être portée telle quelle sur Supabase (tables scans, candidates, observations, ledger).
  */
 
+/**
+ * Une ligne par scan. « reserved » est écrit avant l'appel ; il est remplacé par le coût réel (« actual »),
+ * l'estimation (« estimated ») ou 0 (« released », erreur non facturée). Un scan interrompu garde sa réserve.
+ */
 export interface LedgerEntry {
   scan_id: string;
   at: string;
   cost_usd: number;
-  source: "actual" | "estimated";
+  source: "reserved" | "actual" | "estimated" | "released";
 }
 
 export interface SeenEntry {
@@ -29,7 +34,8 @@ export interface SavedScan {
 
 export interface Store {
   readLedger(): Promise<LedgerEntry[]>;
-  appendLedger(entry: LedgerEntry): Promise<void>;
+  /** Ajoute la ligne du scan, ou remplace celle qui porte le même scan_id. */
+  recordLedger(entry: LedgerEntry): Promise<void>;
   readSeen(): Promise<Record<string, SeenEntry>>;
   writeSeen(seen: Record<string, SeenEntry>): Promise<void>;
   saveScan(scan: SavedScan): Promise<string>;
@@ -70,8 +76,8 @@ export class FileStore implements Store {
     return readJson(this.path("ledger.json"), [] as LedgerEntry[]);
   }
 
-  async appendLedger(entry: LedgerEntry): Promise<void> {
-    const ledger = await this.readLedger();
+  async recordLedger(entry: LedgerEntry): Promise<void> {
+    const ledger = (await this.readLedger()).filter((e) => e.scan_id !== entry.scan_id);
     ledger.push(entry);
     await writeJsonAtomic(this.path("ledger.json"), ledger);
   }
@@ -96,9 +102,14 @@ export class FileStore implements Store {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const fh = await open(lock, "wx");
-        await fh.writeFile(JSON.stringify({ pid: process.pid, at: new Date().toISOString() }));
+        const token = randomUUID();
+        await fh.writeFile(JSON.stringify({ pid: process.pid, at: new Date().toISOString(), token }));
         await fh.close();
-        return () => rm(lock, { force: true });
+        // Ne supprime que son propre verrou (s'il a été repris comme périmé, il appartient à un autre scan).
+        return async () => {
+          const current = await readJson<{ token?: string } | null>(lock, null).catch(() => null);
+          if (current?.token === token) await rm(lock, { force: true });
+        };
       } catch (err) {
         if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
         const info = await stat(lock).catch(() => null);

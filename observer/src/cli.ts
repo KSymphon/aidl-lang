@@ -1,6 +1,6 @@
+import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { fmtUsd, spentOnDay } from "./budget";
 import { loadConfig } from "./config";
 import { SCAN_TYPES, type ScanReport, type ScanType } from "./contract";
@@ -12,15 +12,43 @@ const USAGE = `Usage :
   npm run replay -- <fichier data/scans/....json>
   npm run ledger`;
 
-function arg(args: string[], name: string): string | undefined {
-  const i = args.indexOf(`--${name}`);
-  return i >= 0 ? args[i + 1] : undefined;
+export class UsageError extends Error {}
+
+export interface CliArgs {
+  cmd: string | undefined;
+  type: ScanType;
+  vertical: string;
+  dryRun: boolean;
+  positional: string[];
 }
 
-function parseType(v: string | undefined): ScanType {
-  const t = (v ?? "evening") as ScanType;
-  if (!SCAN_TYPES.includes(t)) throw new Error(`--type invalide : ${v}. ${USAGE}`);
-  return t;
+/**
+ * Arguments stricts : toute option inconnue est refusée AVANT tout appel, pour qu'une faute de frappe
+ * (« --dryrun ») ne lance jamais un scan payant. `npm run scan --dry-run` (sans `--`) est aussi reconnu.
+ */
+export function parseCliArgs(argv: string[], env: NodeJS.ProcessEnv = process.env): CliArgs {
+  const [cmd, ...rest] = argv;
+  const out: CliArgs = {
+    cmd,
+    type: "evening",
+    vertical: "indie-games",
+    dryRun: env.npm_config_dry_run === "true",
+    positional: [],
+  };
+  for (let i = 0; i < rest.length; i++) {
+    const a = rest[i]!;
+    if (a === "--dry-run") out.dryRun = true;
+    else if (a === "--type" || a === "--vertical") {
+      const v = rest[++i];
+      if (!v || v.startsWith("--")) throw new UsageError(`Valeur manquante pour ${a}.\n${USAGE}`);
+      if (a === "--type") {
+        if (!SCAN_TYPES.includes(v as ScanType)) throw new UsageError(`--type invalide : ${v}.\n${USAGE}`);
+        out.type = v as ScanType;
+      } else out.vertical = v;
+    } else if (a.startsWith("-")) throw new UsageError(`Option inconnue : ${a}.\n${USAGE}`);
+    else out.positional.push(a);
+  }
+  return out;
 }
 
 const MARK = { SHORTLIST: "SHORTLIST", WATCH: "SURVEILLER", REJECT: "REJETÉ" } as const;
@@ -79,14 +107,13 @@ export function formatReport(r: ScanReport, file: string): string {
 }
 
 async function main(argv: string[]): Promise<number> {
-  const [cmd, ...args] = argv;
+  const { cmd, type, vertical, dryRun, positional } = parseCliArgs(argv);
   const config = loadConfig();
   const store = new FileStore(config.OBSERVER_DATA_DIR);
 
   if (cmd === "scan") {
-    const type = parseType(arg(args, "type"));
-    const vertical = arg(args, "vertical") ?? "indie-games";
-    if (args.includes("--dry-run")) {
+    if (positional.length > 0) throw new UsageError(`Argument inattendu : ${positional[0]}.\n${USAGE}`);
+    if (dryRun) {
       const prep = prepareScan(type, vertical, config, new Date());
       const spent = spentOnDay(await store.readLedger(), new Date());
       console.log(JSON.stringify(prep.body, null, 2));
@@ -105,14 +132,10 @@ async function main(argv: string[]): Promise<number> {
   }
 
   if (cmd === "replay") {
-    const path = args.find((a) => !a.startsWith("--"));
-    if (!path) throw new Error(USAGE);
+    const path = positional[0];
+    if (!path) throw new UsageError(USAGE);
     const saved: unknown = JSON.parse(await readFile(path, "utf8"));
-    const { report, file } = await replayScan(
-      saved,
-      { type: parseType(arg(args, "type")), vertical: arg(args, "vertical") ?? "indie-games" },
-      { config, store },
-    );
+    const { report, file } = await replayScan(saved, { type, vertical }, { config, store });
     console.log(formatReport(report, file));
     return report.status === "succeeded" ? 0 : 1;
   }
@@ -121,6 +144,9 @@ async function main(argv: string[]): Promise<number> {
     const ledger = await store.readLedger();
     const now = new Date();
     for (const e of ledger.slice(-20)) console.log(`${e.at}  ${e.scan_id}  ${fmtUsd(e.cost_usd)} (${e.source})`);
+    if (ledger.some((e) => e.source === "reserved")) {
+      console.log("« reserved » : scan interrompu ou en échec possiblement facturé — la réserve reste comptée.");
+    }
     console.log(
       `Aujourd'hui (UTC) : ${fmtUsd(spentOnDay(ledger, now))} / ${fmtUsd(config.OBSERVER_DAILY_BUDGET_USD)} · total : ${fmtUsd(ledger.reduce((s, e) => s + e.cost_usd, 0))}`,
     );
@@ -131,12 +157,20 @@ async function main(argv: string[]): Promise<number> {
   return 2;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+function isEntryPoint(): boolean {
+  try {
+    return !!process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
   main(process.argv.slice(2)).then(
     (code) => process.exit(code),
     (err: unknown) => {
       console.error((err as Error).message);
-      process.exit(1);
+      process.exit(err instanceof UsageError ? 2 : 1);
     },
   );
 }

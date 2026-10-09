@@ -55,9 +55,23 @@ export function parseUsage(raw: unknown, model: string, toolCalls: ToolCallInfo[
   };
 }
 
-/** Montant retenu pour le budget : le réel s'il existe, sinon l'estimation. */
-export function billedCost(u: ScanUsage): number {
-  return u.cost_usd_actual ?? u.cost_usd_estimated;
+/**
+ * Montant retenu pour le budget, toujours dans le sens prudent :
+ * - coût réel incohérent avec l'estimation (écart > ×5) : le plus élevé des deux ;
+ * - coût réel absent et compteurs X absents (posts facturés inconnus) : au moins la réserve par scan.
+ */
+export function billedCost(u: ScanUsage, reserveUsd: number): number {
+  if (u.cost_usd_actual !== null) {
+    return costMismatch(u) ? Math.max(u.cost_usd_actual, u.cost_usd_estimated) : u.cost_usd_actual;
+  }
+  return u.usage_details_present ? u.cost_usd_estimated : Math.max(u.cost_usd_estimated, reserveUsd);
+}
+
+/** Réel et estimé divergent de plus de ×5 (unité des ticks ou grille de prix à vérifier). */
+export function costMismatch(u: ScanUsage): boolean {
+  if (u.cost_usd_actual === null || u.cost_usd_estimated <= 0.01) return false;
+  const ratio = u.cost_usd_actual / u.cost_usd_estimated;
+  return ratio > 5 || ratio < 0.2;
 }
 
 const round4 = (n: number) => Math.round(n * 10_000) / 10_000;

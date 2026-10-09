@@ -11,9 +11,11 @@ Règles pour tout agent (Codex, Claude Code, Grok Build) qui modifie ce dossier.
 ## xAI : consignes techniques à jour (vérifiées le 2026-10-06)
 - Appel REST `POST https://api.x.ai/v1/responses` avec l'outil serveur `x_search`. Pas de SDK : il faut lire le JSON brut de `usage`.
 - Interdit : `search_parameters` et `max_search_results` (Live Search retirée le 2026-01-12, HTTP 410), ainsi que les modèles retirés (`grok-3`, `grok-4-fast`, `grok-code-fast-1`).
-- `x_search` n'a pas de `max_results`. Les seuls leviers sont `max_turns`, la fenêtre `from_date`/`to_date` (au jour près), `excluded_x_handles` (20 max) et le prompt.
+- `x_search` n'a pas de `max_results`. Les leviers sont `max_turns` (qui borne les tours, pas les appels quand `parallel_tool_calls` est vrai), la fenêtre `from_date`/`to_date` (au jour près), `excluded_x_handles` (20 max) et le prompt.
+- `include: ["no_inline_citations"]` est obligatoire : sinon xAI insère des liens `[[N]](url)` dans le texte et casse le JSON.
 - X Search est facturé 0,005 $ par post et 0,01 $ par profil, sans dédoublonnage entre recherches ; chaque post d'un thread récupéré compte. Pas de `x_thread_fetch` pendant un scan de découverte.
 - Coût réel : `usage.cost_in_usd_ticks` (1 USD = 1e10 ticks). Compteurs : `usage.server_side_tool_usage_details.{x_posts_fetched, x_users_fetched, x_search_calls}`.
+- Le budget est réservé avant chaque appel et réglé dès la réponse reçue : ne jamais déplacer l'inscription au ledger après un traitement qui peut échouer.
 - Toute hausse du coût par scan (max_turns, nouvelles pistes, vidéo, threads) doit être signalée dans `handoffs/LOG.md`.
 
 ## Pratique

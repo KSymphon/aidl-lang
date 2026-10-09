@@ -79,6 +79,16 @@ export function citationKeySet(citations: string[]): Set<string> {
   return keys;
 }
 
+/** Auteur de chaque post cité, d'après l'URL fournie par xAI (pas celle écrite par le modèle). */
+export function citedXAuthors(citations: string[]): Map<string, string> {
+  const authors = new Map<string, string>();
+  for (const c of citations) {
+    const ref = parseXStatusUrl(c);
+    if (ref?.handle) authors.set(ref.id, ref.handle);
+  }
+  return authors;
+}
+
 export interface EvidenceCheck {
   canonical_url: string | null;
   author_handle: string | null;
@@ -90,7 +100,7 @@ export interface EvidenceCheck {
 
 export function checkEvidence(
   c: GrokCandidate,
-  ctx: { citationKeys: Set<string>; windowStart: Date },
+  ctx: { citationKeys: Set<string>; citedAuthors?: Map<string, string>; windowStart: Date },
 ): EvidenceCheck {
   const flags: VerificationFlag[] = [];
   const ref = parseXStatusUrl(c.evidence_post_url);
@@ -112,16 +122,21 @@ export function checkEvidence(
     flags.push("OUTSIDE_WINDOW");
   }
 
-  // Le post de preuve peut venir d'un tiers qui partage le projet : signalé, pas bloquant.
-  if (handle && ref.handle && handle !== ref.handle) flags.push("HANDLE_MISMATCH");
+  // L'auteur fait foi d'après la citation xAI quand elle porte un handle (les citations sont souvent en
+  // x.com/i/status/<id>, sans handle). Un post de tiers qui partage le projet est signalé, pas bloquant.
+  const citedAuthor = ctx.citedAuthors?.get(ref.id) ?? null;
+  const author = citedAuthor ?? ref.handle;
+  if ((citedAuthor && ref.handle && citedAuthor !== ref.handle) || (handle && author && handle !== author)) {
+    flags.push("HANDLE_MISMATCH");
+  }
 
   if (c.declared_followers !== null || c.declared_post_likes !== null || c.declared_post_views !== null) {
     flags.push("METRICS_DECLARED_BY_MODEL");
   }
 
   return {
-    canonical_url: ref.handle ? `https://x.com/${ref.handle}/status/${ref.id}` : `https://x.com/i/web/status/${ref.id}`,
-    author_handle: ref.handle,
+    canonical_url: author ? `https://x.com/${author}/status/${ref.id}` : `https://x.com/i/web/status/${ref.id}`,
+    author_handle: author,
     post_id: ref.id,
     posted_at: posted ? posted.toISOString() : null,
     cited,

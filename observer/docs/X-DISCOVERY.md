@@ -22,13 +22,14 @@ pistes choisies par le code ─▶ Grok + x_search ─▶ JSON (contrat)
 
 | Contrôle | Règle | Effet |
 |---|---|---|
+| Contrat | chaque candidat est validé séparément (notes 1–5, champs requis) | Un candidat hors contrat est écarté avec une alerte, les autres sont gardés |
 | Preuve | `evidence_post_url` doit être un post X dont l'identifiant figure dans les citations de la réponse | Sinon `INSUFFICIENT_EVIDENCE` : hallucination possible |
 | Recherche réelle | au moins un appel `x_search` ou un post facturé | Sinon tous les candidats sont rejetés |
 | Date | la date est décodée depuis l'identifiant du post (snowflake) | Drapeau `OUTSIDE_WINDOW` si hors fenêtre |
-| Auteur | le handle de l'URL est comparé au handle du créateur | Drapeau `HANDLE_MISMATCH` (un tiers peut partager le projet) |
+| Auteur | l'auteur est pris dans la citation xAI quand elle porte un handle, sinon dans l'URL ; il est comparé au handle du créateur | Drapeau `HANDLE_MISMATCH` (un tiers peut partager le projet). L'auteur n'est jamais pris pour le créateur |
 | Chiffres | abonnés, likes et vues sont « déclarés par le modèle » | `exposure.verified: false` : rien n'est publié sans vérification humaine |
-| Doublons | clés normalisées : handle X, page Steam, page itch.io, dépôt GitHub, domaine | Le doublon le moins bien classé est rejeté (`DUPLICATE`) |
-| Historique | clés déjà vues lors de scans précédents | Drapeau `SEEN_BEFORE` (base de la future watchlist) |
+| Doublons | clés normalisées : handle X déclaré, page Steam (y compris s.team), page itch.io, dépôt GitHub, fiche de store, domaine propre (jamais un hôte partagé : Epic, Google Docs, Ko-fi…) | Le doublon le moins bien classé est rejeté (`DUPLICATE`) ; un doublon vérifié l'emporte toujours |
+| Historique | clés déjà vues lors de scans précédents (une fois par scan, candidats à preuve vérifiée seulement) | Drapeau `SEEN_BEFORE` (base de la future watchlist) |
 
 ## Décision suggérée (l'humain tranche)
 
@@ -50,7 +51,7 @@ Le nombre entre crochets (`[78]`) n'est qu'un ordre d'affichage : 60 % mérite, 
   - tokens en plus.
 - **Coût réel** : `usage.cost_in_usd_ticks / 1e10`. L'estimation (`PRICING` dans `src/config.ts`) ne sert qu'au contrôle. Un écart supérieur à ×5 déclenche une alerte.
 - **Leviers côté requête** :
-  - `max_turns` (3 par défaut) ;
+  - `max_turns` (3 par défaut). Il borne les tours ; avec `parallel_tool_calls=true`, un tour peut contenir plusieurs recherches ;
   - fenêtre au jour près ;
   - 12 gros comptes exclus ;
   - pas d'analyse d'image ni de vidéo ;
@@ -58,8 +59,10 @@ Le nombre entre crochets (`[78]`) n'est qu'un ordre d'affichage : 60 % mérite, 
   
   Aucun de ces leviers n'est un plafond garanti : le modèle décide du nombre de recherches.
 - **Garde-fous côté code** :
-  - budget quotidien (UTC) avec une réserve par scan ;
-  - un seul scan à la fois (verrou) ;
+  - budget quotidien (UTC) avec une réserve par scan. La réserve est inscrite au ledger **avant** l'appel, puis remplacée par le coût dès la réponse reçue. Elle reste comptée si le scan a pu être facturé (5xx, délai dépassé, coupure, corps illisible) ou si le processus meurt en cours. Elle est libérée sur une erreur 4xx ;
+  - montant retenu toujours prudent : le plus élevé du réel et de l'estimé s'ils divergent de plus de ×5, au moins la réserve si les posts facturés sont inconnus ;
+  - un seul scan à la fois (verrou à jeton, expiré après 2 × timeout + 60 s) ;
+  - options inconnues refusées par la CLI : une faute de frappe sur `--dry-run` ne lance jamais un scan payant ;
   - alertes au-delà de 150 posts ou de 1 $ par scan ;
   - un seul nouvel essai, uniquement sur HTTP 429. Après une erreur 5xx ou un délai dépassé, pas de nouvel essai : le scan a pu être facturé.
 - **Plafond dur** : crédits prépayés sans recharge automatique dans la console xAI.
@@ -86,11 +89,12 @@ Depuis la session cloud Claude Code, il faut deux réglages d'environnement :
 
 Ces points reposent sur la documentation et sur le SDK `@ai-sdk/xai` 5.0.20, pas encore sur une réponse réelle. Le code les traite de façon défensive, et la réponse brute est toujours sauvegardée.
 
-1. **Citations** : `citations` (racine) et/ou annotations `url_citation` contiennent bien les URLs des posts récupérés. Si ce n'est pas le cas, tous les candidats sortent en `INSUFFICIENT_EVIDENCE`, avec l'alerte « Aucune citation ».
+1. **Citations** : avec `include: ["no_inline_citations"]`, les annotations `url_citation` (forme observée par d'autres intégrations : `https://x.com/i/status/<id>`) contiennent bien les URLs des posts récupérés. Si ce n'est pas le cas, tous les candidats sortent en `INSUFFICIENT_EVIDENCE`, avec l'alerte « Aucune citation ». Si des liens `[[N]](url)` apparaissent quand même dans le texte, le parsing les retire.
 2. **Compteurs facturés** : `usage.server_side_tool_usage_details` porte `x_posts_fetched` et `x_users_fetched`. Sinon, une alerte le signale.
 3. **Unité du coût** : `cost_in_usd_ticks` est bien en 1e-10 USD. Une alerte se déclenche si l'écart avec l'estimation dépasse ×5.
 4. **Sortie structurée** : `text.format` json_schema strict est accepté avec `x_search`. En cas de refus, l'erreur HTTP est enregistrée.
 5. **Recherches effectives** : les appels apparaissent comme `custom_tool_call` (`x_keyword_search`, …) ou `x_search_call`. Ils sont listés dans « Requêtes de Grok ».
+6. **Nombre de recherches** : comparer `x_search_calls` à `max_turns`. Si l'on mesure régulièrement plus de 4 appels par scan, essayer `OBSERVER_PARALLEL_TOOL_CALLS=false` avec `OBSERVER_MAX_TURNS` entre 4 et 6.
 
 ## Intégration (Codex)
 

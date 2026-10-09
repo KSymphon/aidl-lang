@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { checkEvidence, citationKey, citationKeySet, normalizeHandle, parseXStatusUrl, snowflakeToDate } from "../src/verify";
+import {
+  checkEvidence,
+  citationKey,
+  citationKeySet,
+  citedXAuthors,
+  normalizeHandle,
+  parseXStatusUrl,
+  snowflakeToDate,
+} from "../src/verify";
 import { candidate, snowflakeFor } from "./fixtures";
 
 describe("normalizeHandle", () => {
@@ -79,5 +87,23 @@ describe("checkEvidence", () => {
     const c = candidate({ evidence_post_url: `https://x.com/fanaccount/status/${old}` });
     const ev = checkEvidence(c, { citationKeys: citationKeySet([c.evidence_post_url]), windowStart });
     expect(ev.flags).toEqual(expect.arrayContaining(["OUTSIDE_WINDOW", "HANDLE_MISMATCH"]));
+  });
+
+  it("prend l'auteur dans la citation xAI quand elle porte un handle", () => {
+    const c = candidate();
+    const id = parseXStatusUrl(c.evidence_post_url)!.id;
+    const citations = [`https://x.com/RandomFan/status/${id}`];
+    const ev = checkEvidence(c, { citationKeys: citationKeySet(citations), citedAuthors: citedXAuthors(citations), windowStart });
+    expect(ev).toMatchObject({ cited: true, author_handle: "randomfan" });
+    expect(ev.flags).toContain("HANDLE_MISMATCH");
+  });
+
+  it("une citation sans handle (x.com/i/status/<id>) ne change pas l'auteur", () => {
+    const c = candidate();
+    const id = parseXStatusUrl(c.evidence_post_url)!.id;
+    const citations = [`https://x.com/i/status/${id}`];
+    const ev = checkEvidence(c, { citationKeys: citationKeySet(citations), citedAuthors: citedXAuthors(citations), windowStart });
+    expect(ev).toMatchObject({ cited: true, author_handle: "mossdev" });
+    expect(ev.flags).not.toContain("HANDLE_MISMATCH");
   });
 });

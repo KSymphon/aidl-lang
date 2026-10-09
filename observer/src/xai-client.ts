@@ -50,6 +50,9 @@ export function buildRequestBody(
       },
     },
     store: config.OBSERVER_STORE_AT_XAI,
+    // Sur /v1/responses, xAI insère par défaut des liens [[N]](url) dans le texte, ce qui casserait le JSON.
+    // Les citations restent disponibles dans les annotations url_citation.
+    include: ["no_inline_citations"],
   };
 }
 

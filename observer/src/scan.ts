@@ -1,6 +1,6 @@
 import type { Config } from "./config";
 import {
-  GrokScanOutputSchema,
+  parseGrokOutput,
   type GrokScanOutput,
   type ScanReport,
   type ScanType,
@@ -14,8 +14,8 @@ import { assertCanScan, fmtUsd } from "./budget";
 import { PROMPT_VERSION, buildSystemPrompt, buildUserPrompt, scanWindow } from "./prompt";
 import { exposureBucket, priorityOf, suggestDecision, summaryLine } from "./score";
 import type { SavedScan, SeenEntry, Store } from "./store";
-import { billedCost, parseUsage } from "./usage";
-import { checkEvidence, citationKeySet, normalizeHandle } from "./verify";
+import { billedCost, costMismatch, parseUsage } from "./usage";
+import { checkEvidence, citationKeySet, citedXAuthors, normalizeHandle } from "./verify";
 import { getVertical, pickIntents, type Vertical } from "./verticals";
 import { XaiApiError, buildRequestBody, callResponses, type FetchLike } from "./xai-client";
 
@@ -27,7 +27,6 @@ export interface ScanDeps {
   sleep?: (ms: number) => Promise<void>;
 }
 
-const LOCK_STALE_MS = 15 * 60_000;
 const DECISION_ORDER = { SHORTLIST: 0, WATCH: 1, REJECT: 2 } as const;
 
 function scanId(now: Date, type: ScanType): string {
@@ -54,9 +53,14 @@ export async function runLiveScan(
   const prep = prepareScan(opts.type, opts.vertical, config, startedAt);
   const id = scanId(startedAt, opts.type);
 
-  const release = await store.acquireLock(LOCK_STALE_MS);
+  // Péremption du verrou au-delà de la durée maximale d'un scan (un nouvel essai sur 429 compris).
+  const release = await store.acquireLock(2 * config.OBSERVER_TIMEOUT_MS + 60_000);
   try {
     assertCanScan(await store.readLedger(), config, startedAt);
+    const at = startedAt.toISOString();
+    const reserve = config.OBSERVER_SCAN_RESERVE_USD;
+    // Réservé AVANT l'appel : si le processus meurt pendant le scan, la dépense possible reste comptée.
+    await store.recordLedger({ scan_id: id, at, cost_usd: reserve, source: "reserved" });
 
     const base = {
       scan_id: id,
@@ -65,7 +69,7 @@ export async function runLiveScan(
       vertical: prep.vertical.id,
       model: config.XAI_MODEL,
       prompt_version: PROMPT_VERSION,
-      started_at: startedAt.toISOString(),
+      started_at: at,
       window: prep.window,
       intents: prep.intents.map((i) => i.id),
     };
@@ -75,7 +79,11 @@ export async function runLiveScan(
       raw = (await callResponses(config, prep.body, deps.fetchImpl, deps.sleep)).raw;
     } catch (err) {
       if (!(err instanceof XaiApiError)) throw err;
-      const mayBeBilled = err.code === "TIMEOUT" || err.code === "NETWORK" || (err.httpStatus ?? 0) >= 500;
+      const status = err.httpStatus ?? 0;
+      const mayBeBilled =
+        err.code === "TIMEOUT" || err.code === "NETWORK" || status >= 500 || (err.code === "BAD_JSON" && status < 300);
+      // Facturation possible : la réserve reste au budget. Sinon (4xx), elle est libérée.
+      if (!mayBeBilled) await store.recordLedger({ scan_id: id, at, cost_usd: 0, source: "released" });
       const report: ScanReport = {
         ...base,
         completed_at: now().toISOString(),
@@ -83,7 +91,9 @@ export async function runLiveScan(
         error: { code: err.code, message: err.message },
         usage: null,
         alerts: mayBeBilled
-          ? ["Le scan a pu être exécuté et facturé malgré l'erreur : vérifier la consommation dans la console xAI."]
+          ? [
+              `Le scan a pu être exécuté et facturé malgré l'erreur : la réserve (${fmtUsd(reserve)}) reste comptée dans le budget du jour. Vérifier la consommation réelle dans la console xAI.`,
+            ]
           : [],
         tool_queries: [],
         candidates: [],
@@ -96,6 +106,15 @@ export async function runLiveScan(
       return { report, file };
     }
 
+    // Coût inscrit dès réception, avant tout traitement qui pourrait échouer.
+    const usage = parseUsage(raw, config.XAI_MODEL, extractResponse(raw).toolCalls);
+    await store.recordLedger({
+      scan_id: id,
+      at,
+      cost_usd: billedCost(usage, reserve),
+      source: usage.cost_usd_actual === null ? "estimated" : "actual",
+    });
+
     const seen = await store.readSeen();
     const processed = processResponse(raw, {
       config,
@@ -105,14 +124,6 @@ export async function runLiveScan(
     });
 
     const report: ScanReport = { ...base, completed_at: now().toISOString(), ...processed };
-    if (processed.usage) {
-      await store.appendLedger({
-        scan_id: id,
-        at: startedAt.toISOString(),
-        cost_usd: billedCost(processed.usage),
-        source: processed.usage.cost_usd_actual === null ? "estimated" : "actual",
-      });
-    }
     await store.writeSeen(updateSeen(seen, report.candidates, startedAt));
     const file = await store.saveScan({ report, request: prep.body, response_raw: raw });
     return { report, file };
@@ -138,10 +149,15 @@ export async function replayScan(
   const window = prior?.window ?? scanWindow(fallback.type, startedAt);
   const type = prior?.type ?? fallback.type;
 
+  // L'historique ne doit contenir que ce qui précédait le scan rejoué, sinon il se voit « déjà vu » par lui-même.
+  const seenNow = await deps.store.readSeen();
+  const seen = prior
+    ? Object.fromEntries(Object.entries(seenNow).filter(([, e]) => e.first_seen_at < prior.started_at))
+    : seenNow;
   const processed = processResponse(raw, {
     config: { ...deps.config, XAI_MODEL: prior?.model ?? deps.config.XAI_MODEL },
     windowStart: new Date(`${window.from_date}T00:00:00Z`),
-    seen: await deps.store.readSeen(),
+    seen,
     vertical: getVertical(prior?.vertical ?? fallback.vertical),
   });
   const report: ScanReport = {
@@ -199,27 +215,19 @@ export function processResponse(
   });
 
   if (!extracted.outputText) return fail("NO_FINAL_MESSAGE", "La réponse ne contient pas de message final.");
-  let json: unknown;
-  try {
-    json = JSON.parse(extracted.outputText);
-  } catch {
-    return fail("INVALID_JSON", `Sortie non JSON : ${extracted.outputText.slice(0, 200)}`);
-  }
-  const parsed = GrokScanOutputSchema.safeParse(json);
-  if (!parsed.success) {
-    const issues = parsed.error.issues
-      .slice(0, 5)
-      .map((i) => `${i.path.join(".")}: ${i.message}`)
-      .join("; ");
-    return fail("INVALID_OUTPUT", `Sortie hors contrat — ${issues}`);
-  }
+  const json = parseModelJson(extracted.outputText);
+  if (json === undefined) return fail("INVALID_JSON", `Sortie non JSON : ${extracted.outputText.slice(0, 200)}`);
+  const parsed = parseGrokOutput(json);
+  if (!parsed.ok) return fail("INVALID_OUTPUT", `Sortie hors contrat — ${parsed.issues}`);
+  for (const d of parsed.dropped) alerts.push(`Écarté car hors contrat : ${d}.`);
 
   const searchPerformed = usage.x_search_calls > 0 || (usage.x_posts_fetched ?? 0) > 0;
-  if (!searchPerformed && parsed.data.candidates.length > 0) {
+  if (!searchPerformed && parsed.output.candidates.length > 0) {
     alerts.push("Aucune recherche X détectée mais des candidats renvoyés : tous rejetés (hallucination probable).");
   }
-  const candidates = scoreCandidates(parsed.data, {
+  const candidates = scoreCandidates(parsed.output, {
     citationKeys: citationKeySet(extracted.citations),
+    citedAuthors: citedXAuthors(extracted.citations),
     windowStart: ctx.windowStart,
     searchPerformed,
     seen: ctx.seen,
@@ -233,9 +241,9 @@ export function processResponse(
     alerts,
     tool_queries,
     candidates,
-    discarded: parsed.data.discarded,
-    posts_reviewed_estimate: parsed.data.posts_reviewed_estimate,
-    scan_notes: parsed.data.scan_notes,
+    discarded: parsed.output.discarded,
+    posts_reviewed_estimate: parsed.output.posts_reviewed_estimate,
+    scan_notes: parsed.output.scan_notes,
     counts: {
       returned: candidates.length,
       shortlist: candidates.filter((c) => c.decision === "SHORTLIST").length,
@@ -249,6 +257,7 @@ function scoreCandidates(
   output: GrokScanOutput,
   ctx: {
     citationKeys: Set<string>;
+    citedAuthors: Map<string, string>;
     windowStart: Date;
     searchPerformed: boolean;
     seen: Record<string, SeenEntry>;
@@ -260,7 +269,8 @@ function scoreCandidates(
     const flags: VerificationFlag[] = [...ev.flags];
     if (!ctx.searchPerformed) flags.push("NO_SEARCH_PERFORMED");
     if (c.risks.length > 0) flags.push("RISK_NOTED");
-    const handle = normalizeHandle(c.x_handle) ?? (flags.includes("HANDLE_MISMATCH") ? null : ev.author_handle);
+    // L'auteur du post de preuve n'est pas forcément le créateur (curateur, fan) : pas d'identité déduite.
+    const handle = normalizeHandle(c.x_handle);
     const keys = keysFor({ x_handle: handle, urls: c.other_urls });
     const bucket = exposureBucket(c.declared_followers, ctx.vertical.exposure);
     const priority = priorityOf(c, bucket);
@@ -316,7 +326,11 @@ function lookupSeen(seen: Record<string, SeenEntry>, keys: string[]): ScoredCand
   };
 }
 
-/** Seuls les candidats dont la preuve est vérifiée entrent dans l'historique (pas d'identité hallucinée). */
+/**
+ * Historique des sujets vus. Seuls les candidats dont le post de preuve est vérifié y entrent ; leurs clés
+ * (handle, URLs) restent déclarées par le modèle. Chaque clé compte une fois par scan, avec la meilleure
+ * décision (les candidats arrivent triés SHORTLIST → WATCH → REJECT).
+ */
 export function updateSeen(
   seen: Record<string, SeenEntry>,
   candidates: ScoredCandidate[],
@@ -324,9 +338,12 @@ export function updateSeen(
 ): Record<string, SeenEntry> {
   const next = { ...seen };
   const iso = at.toISOString();
+  const touched = new Set<string>();
   for (const c of candidates) {
     if (c.rejection_reason === "INSUFFICIENT_EVIDENCE") continue;
     for (const k of c.keys) {
+      if (touched.has(k)) continue;
+      touched.add(k);
       const prev = next[k];
       next[k] = {
         first_seen_at: prev?.first_seen_at ?? iso,
@@ -347,17 +364,15 @@ function usageAlerts(usage: ScanUsage, extracted: ExtractedResponse, config: Con
   if ((usage.x_posts_fetched ?? 0) > config.OBSERVER_ALERT_POSTS) {
     alerts.push(`${usage.x_posts_fetched} posts facturés (seuil d'alerte : ${config.OBSERVER_ALERT_POSTS}).`);
   }
-  const cost = billedCost(usage);
+  const cost = billedCost(usage, config.OBSERVER_SCAN_RESERVE_USD);
   if (cost > config.OBSERVER_ALERT_SCAN_USD) {
     alerts.push(`Coût du scan ${fmtUsd(cost)} au-dessus du seuil d'alerte (${fmtUsd(config.OBSERVER_ALERT_SCAN_USD)}).`);
   }
-  if (usage.cost_usd_actual !== null && usage.cost_usd_estimated > 0.01 && usage.cost_usd_actual > 0.01) {
-    const ratio = usage.cost_usd_actual / usage.cost_usd_estimated;
-    if (ratio > 5 || ratio < 0.2) {
-      alerts.push(
-        `Écart réel/estimé ×${ratio.toFixed(2)} : vérifier l'unité de cost_in_usd_ticks et la grille de PRICING (config.ts).`,
-      );
-    }
+  if (costMismatch(usage)) {
+    const ratio = usage.cost_usd_actual! / usage.cost_usd_estimated;
+    alerts.push(
+      `Écart réel/estimé ×${ratio.toFixed(2)} : le budget retient le plus élevé des deux. Vérifier l'unité de cost_in_usd_ticks et la grille PRICING (config.ts).`,
+    );
   }
   if (extracted.toolCalls.some((c) => c.name === "x_thread_fetch")) {
     alerts.push("Un thread complet a été récupéré malgré la consigne (chaque post du thread est facturé).");
@@ -372,4 +387,25 @@ function usageAlerts(usage: ScanUsage, extracted: ExtractedResponse, config: Con
     alerts.push(`Statut de réponse xAI : ${extracted.status}.`);
   }
   return alerts;
+}
+
+/**
+ * JSON du modèle, avec deux défenses si l'option no_inline_citations n'est pas respectée :
+ * retrait des liens [[N]](url) insérés dans le texte, puis extraction du premier objet {...}
+ * si une phrase précède la réponse. Renvoie undefined si rien n'est exploitable.
+ */
+export function parseModelJson(text: string): unknown {
+  const attempts = [text, text.replace(/\s?\[\[\d+\]\]\([^)\s]*\)/g, "")];
+  const last = attempts[1]!;
+  const start = last.indexOf("{");
+  const end = last.lastIndexOf("}");
+  if (start >= 0 && end > start) attempts.push(last.slice(start, end + 1));
+  for (const t of attempts) {
+    try {
+      return JSON.parse(t);
+    } catch {
+      // essai suivant
+    }
+  }
+  return undefined;
 }

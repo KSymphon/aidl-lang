@@ -56,6 +56,20 @@ describe("dédoublonnage", () => {
     expect(urlKey("https://github.com/Moss/Lantern")).toBe("github:moss/lantern");
     expect(urlKey("https://www.lanternmoss.com/press")).toBe("domain:lanternmoss.com");
     expect(urlKey("https://youtube.com/watch?v=1")).toBeNull();
+    expect(urlKey("https://s.team/a/3123450")).toBe("steam:3123450");
+    // Hôtes partagés et sous-domaines de plateformes : jamais une identité de projet.
+    for (const shared of [
+      "https://m.youtube.com/watch?v=1",
+      "https://store.epicgames.com/p/foo",
+      "https://docs.google.com/document/d/x",
+      "https://gamejolt.com/games/foo/1",
+      "https://ko-fi.com/foo",
+      "https://vm.tiktok.com/x",
+      "https://old.reddit.com/r/indiegames",
+    ]) {
+      expect(urlKey(shared), shared).toBeNull();
+    }
+    expect(urlKey("https://play.google.com/store/apps/details?id=Com.Moss.Game")).toBe("playstore:com.moss.game");
     expect(urlKey("https://x.com/mossdev")).toBeNull();
     expect(keysFor({ x_handle: "@MossDev", urls: ["https://store.steampowered.com/app/1/"] })).toEqual([
       "x:mossdev",
