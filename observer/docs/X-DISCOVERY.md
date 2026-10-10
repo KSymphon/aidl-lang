@@ -73,9 +73,8 @@ Le nombre entre crochets (`[78]`) n'est qu'un ordre d'affichage : 60 % mérite, 
 ```bash
 cd observer
 npm install
-cp .env.example .env            # renseigner XAI_API_KEY
+cp .env.example .env            # renseigner XAI_API_KEY (le .env est lu automatiquement)
 npm run scan -- --dry-run       # affiche la requête exacte, n'envoie rien
-set -a; . ./.env; set +a
 npm run scan -- --type evening  # vrai scan : morning | noon | evening
 npm run replay -- data/scans/<scan_id>.json   # rejoue le pipeline sans appel ni dépense
 npm run ledger                  # dépenses enregistrées

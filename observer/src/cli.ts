@@ -108,6 +108,12 @@ export function formatReport(r: ScanReport, file: string): string {
 
 async function main(argv: string[]): Promise<number> {
   const { cmd, type, vertical, dryRun, positional } = parseCliArgs(argv);
+  // Lit observer/.env s'il existe (les variables déjà définies dans l'environnement restent prioritaires).
+  try {
+    process.loadEnvFile(".env");
+  } catch {
+    // pas de .env : on s'appuie sur l'environnement
+  }
   const config = loadConfig();
   const store = new FileStore(config.OBSERVER_DATA_DIR);
 
@@ -123,7 +129,7 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     if (!config.XAI_API_KEY) {
-      console.error("XAI_API_KEY absent. Voir .env.example (ou --dry-run pour voir la requête sans l'envoyer).");
+      console.error("XAI_API_KEY absent : colle ta clé xAI dans observer/.env (ou --dry-run pour voir la requête sans l'envoyer).");
       return 2;
     }
     const { report, file } = await runLiveScan({ type, vertical }, { config, store });
